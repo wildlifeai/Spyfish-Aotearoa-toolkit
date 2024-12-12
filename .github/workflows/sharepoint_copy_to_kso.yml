@@ -1,0 +1,40 @@
+name: Updates kso csv files based on latest copy of sharepoint lists
+
+on:
+  schedule:
+    - cron: '0 0 * * SUN'  # Runs every Sunday at midnight
+  workflow_dispatch:  # Add this line to enable manual triggers
+
+jobs:
+  upload-to-s3:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        pip install pandas boto3 tqdm python-dotenv
+
+    - name: Check latest lists and kso csv files
+      run: |
+        python sharepoint_to_kso.py
+      env:
+        S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        S3_SHAREPOINT_MOVIE_CSV: ${{ secrets.S3_SHAREPOINT_MOVIE_CSV }}
+        S3_SHAREPOINT_SURVEY_CSV: ${{ secrets.S3_SHAREPOINT_SURVEY_CSV }}
+        S3_SHAREPOINT_SITE_CSV: ${{ secrets.S3_SHAREPOINT_SITE_CSV }}
+        S3_SHAREPOINT_SPECIES_CSV: ${{ secrets.S3_SHAREPOINT_SPECIES_CSV }}
+        S3_KSO_MOVIE_CSV: ${{ secrets.S3_KSO_MOVIE_CSV }}
+        S3_KSO_SURVEY_CSV: ${{ secrets.S3_KSO_SURVEY_CSV }}
+        S3_KSO_SITE_CSV: ${{ secrets.S3_KSO_SITE_CSV }}
+        S3_KSO_ANNOTATIONS_CSV: ${{ secrets.S3_KSO_ANNOTATIONS_CSV }}
+        S3_KSO_SPECIES_CSV: ${{ secrets.S3_KSO_SPECIES_CSV }}
