@@ -591,8 +591,8 @@ def compare_and_update_dataframes(
 
     column_mappings = {
         "survey": {},
-        "site": {"ID": "schema_site_id"},
-        "movie": {},
+        "site": {},
+        "movie": {"ID": "id"},
         "species": {"DOC_TaxonID": "species_id"},
     }
 
@@ -604,6 +604,10 @@ def compare_and_update_dataframes(
 
     # Rename the column names in sharepoint_df based on the dictionary
     sharepoint_df.rename(columns=column_mappings[keyword], inplace=True)
+
+    # If keyword is "site", add a new column with incremental IDs
+    if keyword == "site":
+        sharepoint_df["schema_site_id"] = range(1, len(sharepoint_df) + 1)
 
     # Log initial DataFrame information
     logging.info("Initial DataFrame sizes:")
