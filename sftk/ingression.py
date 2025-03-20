@@ -25,20 +25,28 @@ class DataIngression:
         pass
 
 class EmailIngression(DataIngression):
+    # TODO: Implement a method for handling failed extractions
     """
     JSON  data ingressed from emails
-    NOTE: Once an email is opened imap will mark it as read
-    This means if an email FAILS to be processed it will be marked as read and not picked up again
     This is why summary logging is important for record keeping
     The original email_to_sharepoint_copy.py script does not handle this
     Nor does it actually use the move_to_archive method to archive processed emails
     """
     def __init__(self):
+        """
+        Initialises the EmailIngression object and sets up the EmailHandler object
+        """
         super().__init__()
         # Email handler with default values
         self.email_handler = EmailHandler()
 
     def run(self):
+        """
+        Searches the inbox for emails with specific keywords and extracts JSON data from the email body
+
+        Returns:
+            dict[str, list]: A dictionary containing the keyword and the list of extracted JSON data
+        """
         super().run()
         keyword_emails = self.get_inbox()
 
@@ -108,7 +116,7 @@ class EmailIngression(DataIngression):
             dict | None: The extracted JSON data or None if no data was extracted
         """
         message = self.email_handler.get_email_content(id)
-        # Exception raised when the email is empty
+        # Get email content will raise an exception and return None if the email is not found
         if message is None:
             return None
         body = message['body']
