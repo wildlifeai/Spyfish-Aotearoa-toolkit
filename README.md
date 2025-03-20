@@ -18,8 +18,33 @@ This repository contains the scripts and information required to manage the foot
 ## Overview
 Spyfish Aotearoa utilises a citizen science and machine learning approach to classify baited underwater video (BUV) footage collected from New Zealand marine reserves. This project has a modular architecture featuring custom-built applications and software.
 
+## sftk
 
-  
+The Spyfish Aotearoa Toolkit (sftk) is a Python package that provides a set of tools to manage the data pipeline and management of the Spyfish Aotearoa project.
+
+### Usage
+
+The package is not yet installable, but you can use it by adding the root directory to your `PYTHONPATH` and importing the modules you need.
+
+```python
+import sys
+sys.path.append('path/to/Spyfish-Aotearoa-toolkit')
+from sftk import ...
+```
+
+Alternatively you can add to `PYTHONPATH` through your Terminal:
+
+```bash
+export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit
+```
+
+Or add this line to `.bashrc` to make it permanent:
+
+```bash
+echo 'export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit' >> ~/.bashrc
+```
+
+
 ## Metadata management
 
 
