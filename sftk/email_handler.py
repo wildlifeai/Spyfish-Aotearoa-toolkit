@@ -3,6 +3,7 @@ import imaplib
 import json
 import logging
 import re
+import threading
 from dataclasses import dataclass
 from email.header import decode_header
 from email.message import Message
@@ -33,6 +34,7 @@ class EmailHandler(object):
     https://datatracker.ietf.org/doc/html/rfc3501.html
     """
     _instance = None
+    _lock = threading.Lock()
 
     def __new__(cls, *args, **kwargs) -> "EmailHandler":
         """
@@ -41,10 +43,11 @@ class EmailHandler(object):
         Returns:
             EmailHandler: The instance of the class.
         """
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialised = False
-        return cls._instance
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._initialised = False
+            return cls._instance
 
     def __init__(self, *args, **kwargs) -> None:
         """
