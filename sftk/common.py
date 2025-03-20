@@ -7,7 +7,7 @@ def load_env_wrapper() -> None:
 
     Guard clause added to prevent loading environment variables when running in a GitHub Actions environment.
     """
-    if os.environ.get("GITHUB_ACTIONS") == "true":
+    if os.getenv("GITHUB_ACTIONS") == "true":
         return
 
     load_dotenv()
