@@ -3,7 +3,7 @@ name: Generate Documentation
 on:
   push:
     branches:
-      - ed-docs-gen
+      - main
 
 jobs:
   generate_docs:
@@ -34,4 +34,4 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/
           git commit -m "Update generated docs"
-          git push origin ed-docs-gen
+          git push origin main
