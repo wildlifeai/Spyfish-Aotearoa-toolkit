@@ -1,0 +1,284 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module sftk.email_handler</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong><a href="sftk.html"><font color="#ffffff">sftk</font></a>.email_handler</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/home/ed/code/Eatkin/wildlifeai/Spyfish-Aotearoa-toolkit/sftk/email_handler.py">/home/ed/code/Eatkin/wildlifeai/Spyfish-Aotearoa-toolkit/sftk/email_handler.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="email.html">email</a><br>
+<a href="imaplib.html">imaplib</a><br>
+</td><td width="25%" valign=top><a href="json.html">json</a><br>
+<a href="sftk.log_config.html">sftk.log_config</a><br>
+</td><td width="25%" valign=top><a href="logging.html">logging</a><br>
+<a href="re.html">re</a><br>
+</td><td width="25%" valign=top><a href="threading.html">threading</a><br>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="builtins.html#object">builtins.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="sftk.email_handler.html#Email">Email</a>
+</font></dt><dt><font face="helvetica, arial"><a href="sftk.email_handler.html#EmailHandler">EmailHandler</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Email">class <strong>Email</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt><a href="#Email">Email</a>(subject:&nbsp;str,&nbsp;sender:&nbsp;str,&nbsp;to:&nbsp;str,&nbsp;date:&nbsp;str,&nbsp;body:&nbsp;str,&nbsp;attachments:&nbsp;list[str])&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Dataclass&nbsp;for&nbsp;storing&nbsp;email&nbsp;data.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Email-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><tt>Return&nbsp;self==value.</tt></dd></dl>
+
+<dl><dt><a name="Email-__init__"><strong>__init__</strong></a>(self, subject: str, sender: str, to: str, date: str, body: str, attachments: list[str]) -&gt; None</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="Email-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><tt>Return&nbsp;repr(self).</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'attachments': list[str], 'body': &lt;class 'str'&gt;, 'date': &lt;class 'str'&gt;, 'sender': &lt;class 'str'&gt;, 'subject': &lt;class 'str'&gt;, 'to': &lt;class 'str'&gt;}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'attachments': Field(name='attachments',type=list[str],default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'body': Field(name='body',type=&lt;class 'str'&gt;,default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'date': Field(name='date',type=&lt;class 'str'&gt;,default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'sender': Field(name='sender',type=&lt;class 'str'&gt;,default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subject': Field(name='subject',type=&lt;class 'str'&gt;,default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'to': Field(name='to',type=&lt;class 'str'&gt;,default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,order=False,unsafe_hash=False,frozen=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('subject', 'sender', 'to', 'date', 'body', 'attachments')</dl>
+
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="EmailHandler">class <strong>EmailHandler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt><a href="#EmailHandler">EmailHandler</a>(*args,&nbsp;**kwargs)&nbsp;-&amp;gt;&nbsp;'<a href="#EmailHandler">EmailHandler</a>'<br>
+&nbsp;<br>
+Singleton&nbsp;class&nbsp;for&nbsp;interacting&nbsp;with&nbsp;<a href="#Email">Email</a>.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;essentially&nbsp;a&nbsp;wrapper&nbsp;around&nbsp;the&nbsp;imaplib.IMAP4_SSL&nbsp;class.<br>
+It&nbsp;provides&nbsp;additional&nbsp;helper&nbsp;functions&nbsp;and&nbsp;cleaning&nbsp;to&nbsp;make&nbsp;it&nbsp;easier&nbsp;to&nbsp;interact&nbsp;with&nbsp;the&nbsp;email&nbsp;server.<br>
+<a href="#Email">Email</a>.mail&nbsp;is&nbsp;an&nbsp;imaplib.IMAP4_SSL&nbsp;<a href="builtins.html#object">object</a>,&nbsp;so&nbsp;you&nbsp;can&nbsp;use&nbsp;it&nbsp;directly&nbsp;if&nbsp;needed.<br>
+The&nbsp;Python&nbsp;imaplib&nbsp;and&nbsp;email&nbsp;docs&nbsp;are&nbsp;cursed,&nbsp;so&nbsp;this&nbsp;class&nbsp;aims&nbsp;to&nbsp;make&nbsp;it&nbsp;easier&nbsp;to&nbsp;work&nbsp;with&nbsp;emails.<br>
+&nbsp;<br>
+For&nbsp;more&nbsp;information&nbsp;on&nbsp;IMAP,&nbsp;see&nbsp;the&nbsp;RFC:<br>
+<a href="https://datatracker.ietf.org/doc/html/rfc3501.html">https://datatracker.ietf.org/doc/html/rfc3501.html</a><br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="EmailHandler-__del__"><strong>__del__</strong></a>(self) -&gt; None</dt><dd><tt>Destructor&nbsp;for&nbsp;the&nbsp;<a href="#EmailHandler">EmailHandler</a>&nbsp;class.<br>
+&nbsp;<br>
+This&nbsp;function&nbsp;logs&nbsp;out&nbsp;of&nbsp;the&nbsp;email&nbsp;server&nbsp;if&nbsp;the&nbsp;connection&nbsp;is&nbsp;still&nbsp;open.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-__init__"><strong>__init__</strong></a>(self, *args, **kwargs) -&gt; None</dt><dd><tt>Constructor&nbsp;for&nbsp;the&nbsp;<a href="#EmailHandler">EmailHandler</a>&nbsp;class.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;**kwargs:&nbsp;Keyword&nbsp;arguments&nbsp;for&nbsp;the&nbsp;constructor.<br>
+&nbsp;<br>
+This&nbsp;function&nbsp;logs&nbsp;into&nbsp;the&nbsp;email&nbsp;server&nbsp;and&nbsp;selects&nbsp;the&nbsp;inbox&nbsp;if&nbsp;the&nbsp;connection&nbsp;is&nbsp;not&nbsp;already&nbsp;open.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-__repr__"><strong>__repr__</strong></a>(self) -&gt; str</dt><dd><tt>Returns&nbsp;a&nbsp;string&nbsp;representation&nbsp;of&nbsp;the&nbsp;<a href="#EmailHandler">EmailHandler</a>&nbsp;class.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;string&nbsp;representation&nbsp;of&nbsp;the&nbsp;EmailHander&nbsp;class.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-close"><strong>close</strong></a>(self) -&gt; None</dt><dd><tt>Log&nbsp;out&nbsp;and&nbsp;close&nbsp;the&nbsp;IMAP&nbsp;connection&nbsp;gracefully.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-expunge"><strong>expunge</strong></a>(self) -&gt; None</dt><dd><tt>Expunge&nbsp;the&nbsp;mailbox&nbsp;to&nbsp;permanently&nbsp;delete&nbsp;emails&nbsp;marked&nbsp;for&nbsp;deletion.<br>
+&nbsp;<br>
+Literally&nbsp;just&nbsp;the&nbsp;expunge&nbsp;function&nbsp;from&nbsp;the&nbsp;imaplib&nbsp;module.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;expunge&nbsp;fails.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-get_archive_folder"><strong>get_archive_folder</strong></a>(self) -&gt; str</dt><dd><tt>Get&nbsp;the&nbsp;archive&nbsp;folder&nbsp;from&nbsp;the&nbsp;list&nbsp;of&nbsp;mailboxes.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;archive&nbsp;folder&nbsp;name.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;the&nbsp;archive&nbsp;folder&nbsp;is&nbsp;not&nbsp;found.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-get_email_content"><strong>get_email_content</strong></a>(self, mail_id: str) -&gt; Optional[sftk.email_handler.Email]</dt><dd><tt>Get&nbsp;the&nbsp;content&nbsp;of&nbsp;an&nbsp;email.<br>
+&nbsp;<br>
+This&nbsp;function&nbsp;fetches&nbsp;the&nbsp;email&nbsp;content&nbsp;using&nbsp;the&nbsp;fetch&nbsp;method&nbsp;and&nbsp;returns&nbsp;the&nbsp;email&nbsp;body.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mail_id&nbsp;(str):&nbsp;The&nbsp;email&nbsp;ID&nbsp;to&nbsp;fetch.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;email&nbsp;body&nbsp;if&nbsp;found,&nbsp;otherwise&nbsp;None.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;fetch&nbsp;fails.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Exception:&nbsp;If&nbsp;the&nbsp;email&nbsp;body&nbsp;cannot&nbsp;be&nbsp;extracted.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-get_mailboxes"><strong>get_mailboxes</strong></a>(self) -&gt; tuple[str, list[str]]</dt><dd><tt>Get&nbsp;a&nbsp;list&nbsp;of&nbsp;mailboxes&nbsp;on&nbsp;the&nbsp;email&nbsp;server.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;list[str]:&nbsp;A&nbsp;list&nbsp;of&nbsp;mailboxes.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;request&nbsp;fails.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-login"><strong>login</strong></a>(self, email: str, password: str, mailbox: str) -&gt; None</dt><dd><tt>Log&nbsp;into&nbsp;the&nbsp;email&nbsp;server&nbsp;and&nbsp;select&nbsp;the&nbsp;inbox.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;email&nbsp;(str):&nbsp;The&nbsp;email&nbsp;address&nbsp;to&nbsp;log&nbsp;in&nbsp;with.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;password&nbsp;(str):&nbsp;The&nbsp;password&nbsp;for&nbsp;the&nbsp;email&nbsp;address.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mailbox&nbsp;(str):&nbsp;The&nbsp;mailbox&nbsp;to&nbsp;select.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;login&nbsp;fails.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-move_to_archive"><strong>move_to_archive</strong></a>(self, mail_id: str, delete: bool = True) -&gt; None</dt><dd><tt>Move&nbsp;an&nbsp;email&nbsp;to&nbsp;the&nbsp;archive&nbsp;folder.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mail_id&nbsp;(str):&nbsp;The&nbsp;email&nbsp;ID&nbsp;to&nbsp;move.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;delete&nbsp;(bool):&nbsp;Whether&nbsp;to&nbsp;delete&nbsp;the&nbsp;email&nbsp;after&nbsp;moving&nbsp;(default&nbsp;True).<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;move&nbsp;fails.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;the&nbsp;archive&nbsp;folder&nbsp;is&nbsp;not&nbsp;found.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-search"><strong>search</strong></a>(self, charset: str = None, *criterion: str) -&gt; tuple[str, list[str]]</dt><dd><tt>Search&nbsp;the&nbsp;inbox&nbsp;for&nbsp;emails&nbsp;matching&nbsp;the&nbsp;given&nbsp;criteria.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;charset&nbsp;(str):&nbsp;The&nbsp;character&nbsp;set&nbsp;to&nbsp;use&nbsp;(default&nbsp;None).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;*criterion&nbsp;(str):&nbsp;The&nbsp;search&nbsp;criteria,&nbsp;e.g.&nbsp;"UNSEEN",&nbsp;'SUBJECT&nbsp;"Hello"'<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;list[str]:&nbsp;List&nbsp;of&nbsp;email&nbsp;IDs.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;search&nbsp;fails.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-set_email_flags"><strong>set_email_flags</strong></a>(self, mail_id: str, flags: str | list[str]) -&gt; None</dt><dd><tt>Helper&nbsp;function&nbsp;to&nbsp;set&nbsp;flags&nbsp;using&nbsp;plaintext&nbsp;commands.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mail_id&nbsp;(str):&nbsp;The&nbsp;email&nbsp;ID&nbsp;to&nbsp;set&nbsp;flags&nbsp;for.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;flags&nbsp;(str&nbsp;|&nbsp;list[str]):&nbsp;The&nbsp;flags&nbsp;to&nbsp;set.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;command&nbsp;fails.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-set_mailbox"><strong>set_mailbox</strong></a>(self, mailbox: str) -&gt; None</dt><dd><tt>Select&nbsp;a&nbsp;mailbox&nbsp;on&nbsp;the&nbsp;email&nbsp;server.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mailbox&nbsp;(str):&nbsp;The&nbsp;mailbox&nbsp;to&nbsp;select.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;Mailbox&nbsp;name.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;imaplib.IMAP4.error:&nbsp;If&nbsp;the&nbsp;mailbox&nbsp;selection&nbsp;fails.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;the&nbsp;mailbox&nbsp;is&nbsp;not&nbsp;found.</tt></dd></dl>
+
+<hr>
+Static methods defined here:<br>
+<dl><dt><a name="EmailHandler-__new__"><strong>__new__</strong></a>(cls, *args, **kwargs) -&gt; 'EmailHandler'</dt><dd><tt>Create&nbsp;a&nbsp;new&nbsp;instance&nbsp;of&nbsp;the&nbsp;class&nbsp;if&nbsp;one&nbsp;does&nbsp;not&nbsp;already&nbsp;exist.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#EmailHandler">EmailHandler</a>:&nbsp;The&nbsp;instance&nbsp;of&nbsp;the&nbsp;class.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-decode_mime_header"><strong>decode_mime_header</strong></a>(header_value: Optional[str]) -&gt; Optional[str]</dt><dd><tt>Decodes&nbsp;MIME-encoded&nbsp;email&nbsp;headers.<br>
+&nbsp;<br>
+Takes&nbsp;a&nbsp;header&nbsp;value&nbsp;and&nbsp;decodes&nbsp;it&nbsp;using&nbsp;the&nbsp;email.header.decode_header&nbsp;function.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;header_value&nbsp;(str):&nbsp;The&nbsp;header&nbsp;value&nbsp;to&nbsp;decode.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;decoded&nbsp;header</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-extract_attachments"><strong>extract_attachments</strong></a>(msg: email.message.Message)</dt><dd><tt>Extracts&nbsp;attachment&nbsp;filenames&nbsp;from&nbsp;an&nbsp;email.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-extract_json_from_body"><strong>extract_json_from_body</strong></a>(body: str) -&gt; Optional[dict]</dt><dd><tt>Extract&nbsp;and&nbsp;validate&nbsp;JSON&nbsp;from&nbsp;an&nbsp;email&nbsp;body.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;searches&nbsp;for&nbsp;a&nbsp;JSON&nbsp;<a href="builtins.html#object">object</a>&nbsp;within&nbsp;the&nbsp;email&nbsp;body&nbsp;using&nbsp;a<br>
+regular&nbsp;expression.&nbsp;If&nbsp;a&nbsp;valid&nbsp;JSON&nbsp;<a href="builtins.html#object">object</a>&nbsp;is&nbsp;found,&nbsp;it&nbsp;is&nbsp;parsed<br>
+and&nbsp;returned&nbsp;as&nbsp;a&nbsp;Python&nbsp;dictionary.&nbsp;If&nbsp;no&nbsp;JSON&nbsp;is&nbsp;found&nbsp;or&nbsp;the<br>
+format&nbsp;is&nbsp;invalid,&nbsp;the&nbsp;function&nbsp;logs&nbsp;an&nbsp;error&nbsp;and&nbsp;returns&nbsp;None.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;body&nbsp;(str):&nbsp;The&nbsp;email&nbsp;body&nbsp;to&nbsp;search&nbsp;for&nbsp;JSON&nbsp;content.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Optional[dict]:&nbsp;A&nbsp;dictionary&nbsp;representation&nbsp;of&nbsp;the&nbsp;JSON&nbsp;content,&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;if&nbsp;extraction&nbsp;fails.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-format_criteria"><strong>format_criteria</strong></a>(*criterion: str) -&gt; str</dt><dd><tt>Format&nbsp;the&nbsp;search&nbsp;criteria&nbsp;into&nbsp;a&nbsp;string&nbsp;to&nbsp;be&nbsp;used&nbsp;in&nbsp;the&nbsp;search&nbsp;function.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;*criterion&nbsp;(str):&nbsp;The&nbsp;search&nbsp;criteria.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;formatted&nbsp;search&nbsp;criteria.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-get_email_body_from_msg"><strong>get_email_body_from_msg</strong></a>(msg: email.message.Message) -&gt; str</dt><dd><tt>Extracts&nbsp;plain-text&nbsp;body&nbsp;from&nbsp;an&nbsp;email.message.Message&nbsp;<a href="builtins.html#object">object</a>.</tt></dd></dl>
+
+<dl><dt><a name="EmailHandler-to_email"><strong>to_email</strong></a>(msg: email.message.Message) -&gt; sftk.email_handler.Email</dt><dd><tt>Converts&nbsp;an&nbsp;Message&nbsp;<a href="builtins.html#object">object</a>&nbsp;into&nbsp;an&nbsp;<a href="#Email">Email</a>&nbsp;<a href="builtins.html#object">object</a>.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;msg&nbsp;(Message):&nbsp;The&nbsp;email&nbsp;message&nbsp;<a href="builtins.html#object">object</a>.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Email">Email</a>:&nbsp;The&nbsp;<a href="#Email">Email</a>&nbsp;<a href="builtins.html#object">object</a>.</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>EMAIL_ARCHIVE_FOLDER_CANDIDATES</strong> = ['[Gmail]/All Mail', 'Archive', 'Archived', 'INBOX.Archive']<br>
+<strong>EMAIL_PASS</strong> = None<br>
+<strong>EMAIL_USER</strong> = None<br>
+<strong>IMAP_PORT</strong> = 993<br>
+<strong>IMAP_SERVER</strong> = 'imap.gmail.com'<br>
+<strong>Optional</strong> = typing.Optional</td></tr></table>
+</body></html>
