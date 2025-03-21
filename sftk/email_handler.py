@@ -84,13 +84,12 @@ class EmailHandler(object):
         Raises:
             imaplib.IMAP4.error: If the login fails.
         """
-        try:
-            self.mail.login(email, password)
-            self.set_mailbox(mailbox)
-            logging.info("Logged into the inbox.")
-        except imaplib.IMAP4.error as e:
-            logging.error(f"Failed to login: {e}")
-            raise
+        if res != "OK":
+            logging.error(f"Failed to login for email {email}: {res}")
+            raise imaplib.IMAP4.error(f"Failed to login for email {email}: {res}")
+
+        self.set_mailbox(mailbox)
+        logging.info("Logged into the inbox.")
 
     def search(self, charset: str = None, *criterion: str) -> tuple[str, list[str]]:
         """
@@ -394,9 +393,9 @@ class EmailHandler(object):
         if msg.is_multipart():
             for part in msg.walk():
                 if part.get_content_type() == "text/plain" and "attachment" not in str(part.get("Content-Disposition", "")):
-                    return part.get_payload(decode=True).decode(errors="ignore")
+                    return part.get_payload(decode=True).decode(errors="ignore").strip()
         else:
-            return msg.get_payload(decode=True).decode(errors="ignore")
+            return msg.get_payload(decode=True).decode(errors="ignore").strip()
         return "(No content found)"
 
     @staticmethod
