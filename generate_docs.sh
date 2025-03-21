@@ -3,12 +3,13 @@
 mkdir -p docs
 
 # Remove pre-existing docs
-find docs -type f -name "*.html" -delete
+find docs -type f -name "*.html" -delete || true
 
 
 package="sftk"
 # Generate the base package documentation and copy to index.html so it can be launched as a http server
 python -m pydoc -w "$package"
+# Sed command removes links to the source code
 sed -i 's|<a href="[^"]*\.py">[^<]*</a>||g' "$package.html"
 cp -f "$package.html" "docs/index.html"
 # Move the original so linking works
