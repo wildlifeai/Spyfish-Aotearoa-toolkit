@@ -84,10 +84,9 @@ class EmailHandler(object):
         Raises:
             imaplib.IMAP4.error: If the login fails.
         """
-        res, _ = self.mail.login(email, password)
         if res != "OK":
-            logging.error(f"Failed to login: {res}")
-            raise imaplib.IMAP4.error(f"Failed to login: {res}")
+            logging.error(f"Failed to login for email {email}: {res}")
+            raise imaplib.IMAP4.error(f"Failed to login for email {email}: {res}")
 
         self.set_mailbox(mailbox)
         logging.info("Logged into the inbox.")
