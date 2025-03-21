@@ -8,4 +8,8 @@ def flatten_list(lst: list[list]) -> list:
     Returns:
         list: A flattened list.
     """
-    return [item for sublist in lst for item in sublist]
+    flattened = []
+    for item in lst:
+        item = flatten_list(item) if isinstance(item, list) else [item]
+        flattened.extend(item)
+    return flattened
