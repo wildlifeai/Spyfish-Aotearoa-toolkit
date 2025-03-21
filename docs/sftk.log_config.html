@@ -25,13 +25,18 @@
 <font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
     
 <tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
-<td width="100%"><dl><dt><a name="-get_log_level"><strong>get_log_level</strong></a>(level: str) -&gt; int</dt><dd><tt>Converts&nbsp;a&nbsp;string&nbsp;log&nbsp;level&nbsp;to&nbsp;a&nbsp;corresponding&nbsp;logging&nbsp;constant.<br>
+<td width="100%"><dl><dt><a name="-clear_logs_directory"><strong>clear_logs_directory</strong></a>() -&gt; None</dt><dd><tt>Clear&nbsp;the&nbsp;logs&nbsp;directory&nbsp;by&nbsp;deleting&nbsp;all&nbsp;log&nbsp;files&nbsp;(except&nbsp;the&nbsp;current&nbsp;log&nbsp;file).</tt></dd></dl>
+ <dl><dt><a name="-convert_log_level"><strong>convert_log_level</strong></a>(level: str) -&gt; int</dt><dd><tt>Converts&nbsp;a&nbsp;string&nbsp;log&nbsp;level&nbsp;to&nbsp;a&nbsp;corresponding&nbsp;logging&nbsp;constant.<br>
 &nbsp;<br>
 Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;level&nbsp;(str):&nbsp;The&nbsp;logging&nbsp;level&nbsp;as&nbsp;a&nbsp;string&nbsp;(e.g.,&nbsp;"DEBUG",&nbsp;"INFO").<br>
 &nbsp;<br>
 Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;int:&nbsp;The&nbsp;corresponding&nbsp;logging&nbsp;level&nbsp;constant.</tt></dd></dl>
+ <dl><dt><a name="-get_log_level"><strong>get_log_level</strong></a>() -&gt; str</dt><dd><tt>Retrieves&nbsp;the&nbsp;current&nbsp;logging&nbsp;level.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;The&nbsp;current&nbsp;logging&nbsp;level&nbsp;as&nbsp;a&nbsp;string&nbsp;(e.g.,&nbsp;"DEBUG",&nbsp;"INFO",&nbsp;"WARNING",&nbsp;"ERROR",&nbsp;"CRITICAL").</tt></dd></dl>
  <dl><dt><a name="-set_log_level"><strong>set_log_level</strong></a>(level: str) -&gt; None</dt><dd><tt>Dynamically&nbsp;sets&nbsp;the&nbsp;logging&nbsp;level&nbsp;for&nbsp;the&nbsp;root&nbsp;logger.<br>
 &nbsp;<br>
 Args:<br>
@@ -43,6 +48,5 @@ Args:<br>
 <font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
     
 <tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
-<td width="100%"><strong>LOG_LEVEL</strong> = 'INFO'<br>
-<strong>LOG_PATH</strong> = '/home/runner/.sftk/logs/2025-03-21_19-07-07.log'</td></tr></table>
+<td width="100%"><strong>LOG_PATH</strong> = '/home/runner/.sftk/logs/2025-03-21_21-58-58.log'</td></tr></table>
 </body></html>
