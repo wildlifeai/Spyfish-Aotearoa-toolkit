@@ -23,7 +23,7 @@ def _set_logging_path() -> str:
     return str(log_file)
 
 @cache
-def get_log_level(level: str) -> int:
+def convert_log_level(level: str) -> int:
     """
     Converts a string log level to a corresponding logging constant.
 
@@ -50,7 +50,7 @@ def set_log_level(level: str) -> None:
     Args:
         level (str): The logging level as a string (e.g., "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
     """
-    global LOG_LEVEL
+    global _LOG_LEVEL
     level_dict = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -61,17 +61,35 @@ def set_log_level(level: str) -> None:
 
     if level.upper() in level_dict:
         logging.getLogger().setLevel(level_dict[level.upper()])
-        LOG_LEVEL = level
+        _LOG_LEVEL = level
     else:
         raise ValueError(f"Invalid log level: {level}")
+
+def get_log_level() -> str:
+    """
+    Retrieves the current logging level.
+
+    Returns:
+        str: The current logging level as a string (e.g., "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
+    """
+    return _LOG_LEVEL
+
+def clear_logs_directory() -> None:
+    """
+    Clear the logs directory by deleting all log files (except the current log file).
+    """
+    log_dir = Path(LOG_PATH).parent
+    for log_file in log_dir.iterdir():
+        if log_file != Path(LOG_PATH) and log_file.is_file():
+            log_file.unlink()
 
 
 # Configure the logging module in global scope to ensure that all modules use the same configuration.
 LOG_PATH = _set_logging_path()
-LOG_LEVEL = "INFO"
+_LOG_LEVEL = "INFO"
 logging.basicConfig(
     filename=LOG_PATH,
-    level=get_log_level(LOG_LEVEL),
+    level=convert_log_level(_LOG_LEVEL),
     format="%(asctime)s - %(levelname)s - %(message)s",
     force=True,
 )
