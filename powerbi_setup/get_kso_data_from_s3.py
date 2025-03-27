@@ -124,7 +124,7 @@ def process_annotations_dataframe(dataframes: Dict[str, pd.DataFrame]) -> pd.Dat
             .merge(dataframes["species"], on="scientificName", how="left")
         )
 
-        return annotations_df
+        return (annotations_df,)
     except Exception as e:
         logger.error(f"Failed to process annotations dataframe: {e}")
         raise
@@ -182,7 +182,8 @@ def main(env_path=None):
             "Processed annotations dataframe saved to 'processed_annotations.csv'"
         )
 
-        return processed_annotations_df
+        return processed_annotations_df, dataframes["movies"]
+
     except Exception as process_error:
         logger.error(f"Failed to process annotations dataframe: {process_error}")
         raise
