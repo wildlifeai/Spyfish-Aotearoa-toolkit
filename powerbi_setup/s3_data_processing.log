@@ -1,0 +1,14 @@
+2025-03-28 12:55:08,748 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
+2025-03-28 12:55:08,991 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3
+2025-03-28 12:55:10,315 - get_kso_data_from_s3 - INFO - Successfully read annotations. Shape: (1595, 7)
+2025-03-28 12:55:10,315 - get_kso_data_from_s3 - INFO - Attempting to read movies from S3
+2025-03-28 12:55:10,585 - get_kso_data_from_s3 - INFO - Successfully read movies. Shape: (567, 25)
+2025-03-28 12:55:10,586 - get_kso_data_from_s3 - INFO - Attempting to read sites from S3
+2025-03-28 12:55:10,713 - get_kso_data_from_s3 - INFO - Successfully read sites. Shape: (559, 17)
+2025-03-28 12:55:10,717 - get_kso_data_from_s3 - INFO - Attempting to read surveys from S3
+2025-03-28 12:55:10,830 - get_kso_data_from_s3 - INFO - Successfully read surveys. Shape: (57, 27)
+2025-03-28 12:55:10,830 - get_kso_data_from_s3 - INFO - Attempting to read species from S3
+2025-03-28 12:55:10,959 - get_kso_data_from_s3 - INFO - Successfully read species. Shape: (195, 7)
+2025-03-28 12:55:10,971 - get_kso_data_from_s3 - ERROR - Failed to process annotations dataframe: 'tuple' object has no attribute 'shape'
+2025-03-28 12:57:38,491 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
+2025-03-28 12:57:38,502 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3

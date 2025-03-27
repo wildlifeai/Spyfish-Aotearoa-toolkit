@@ -124,7 +124,7 @@ def process_annotations_dataframe(dataframes: Dict[str, pd.DataFrame]) -> pd.Dat
             .merge(dataframes["species"], on="scientificName", how="left")
         )
 
-        return (annotations_df,)
+        return annotations_df
     except Exception as e:
         logger.error(f"Failed to process annotations dataframe: {e}")
         raise
