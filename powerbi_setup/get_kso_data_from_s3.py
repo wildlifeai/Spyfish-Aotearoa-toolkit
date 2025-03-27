@@ -181,8 +181,9 @@ def main(env_path=None):
         logger.info(
             "Processed annotations dataframe saved to 'processed_annotations.csv'"
         )
+        movies_df = dataframes["movies"]
 
-        return processed_annotations_df, dataframes["movies"]
+        return processed_annotations_df, movies_df
 
     except Exception as process_error:
         logger.error(f"Failed to process annotations dataframe: {process_error}")
