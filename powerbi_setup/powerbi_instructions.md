@@ -26,7 +26,7 @@ conda activate powerbi_env
 
 Install required packages:
 ```Bash
-pip install pandas boto3 python-dotenv matplotlib
+pip install requests pandas boto3 python-dotenv matplotlib
 ```
 
 #### Safely save the AWS credentials in the Anaconda environment

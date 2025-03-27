@@ -14,10 +14,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables from .env file only in local environment
-if os.environ.get("GITHUB_ACTIONS") != "true":
-    load_dotenv()
-
 
 # S3 configuration
 def load_aws_credentials(env_path):
