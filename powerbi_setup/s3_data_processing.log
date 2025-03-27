@@ -12,3 +12,7 @@
 2025-03-28 12:55:10,971 - get_kso_data_from_s3 - ERROR - Failed to process annotations dataframe: 'tuple' object has no attribute 'shape'
 2025-03-28 12:57:38,491 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
 2025-03-28 12:57:38,502 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3
+2025-03-28 12:58:09,659 - get_kso_data_from_s3 - ERROR - Failed to process S3 file spyfish_metadata/kso_csvs/annotations_buv_doc.csv: Could not connect to the endpoint URL: "https://marine-buv.s3.amazonaws.com/spyfish_metadata/kso_csvs/annotations_buv_doc.csv"
+2025-03-28 12:58:09,659 - get_kso_data_from_s3 - ERROR - Failed to read annotations: Could not download or read file spyfish_metadata/kso_csvs/annotations_buv_doc.csv
+2025-03-28 12:58:24,560 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
+2025-03-28 12:58:24,567 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3
