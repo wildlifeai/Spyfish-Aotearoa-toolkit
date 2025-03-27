@@ -169,40 +169,20 @@ def main(env_path=None):
             logger.error(f"Failed to read {name}: {read_error}")
             raise
 
-    # Calculate the max count per movie, annotator and species
-    max_count_df = (
-        dataframes["annotations"]
-        .groupby(["DropID", "annotatedBy", "scientificName"], as_index=False)[
-            "maxinterval"
-        ]
-        .max()
-    )
+    # Process the annotations dataframe using the dedicated function
+    try:
+        processed_annotations_df = process_annotations_dataframe(dataframes)
+        logger.info(
+            f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
+        )
 
-    # Create a DataFrame with all possible combinations of DropID, annotatedBy, and species
-    all_combinations = pd.MultiIndex.from_product(
-        [
-            max_count_df["DropID"].unique(),
-            max_count_df["annotatedBy"].unique(),
-            max_count_df["scientificName"].unique(),
-        ],
-        names=["DropID", "annotatedBy", "scientificName"],
-    )
-    all_combinations_df = pd.DataFrame(index=all_combinations).reset_index()
+        # Export processed annotations to CSV
+        processed_annotations_df.to_csv("processed_annotations.csv", index=False)
+        logger.info(
+            "Processed annotations dataframe saved to 'processed_annotations.csv'"
+        )
 
-    # Merge the original DataFrame with all combinations, filling missing values with NaN
-    comb_max_count_df = all_combinations_df.merge(
-        max_count_df, how="left", on=["DropID", "annotatedBy", "scientificName"]
-    )
-
-    # Comprehensive merge across different dataframes
-    annotations_df = (
-        comb_max_count_df.merge(dataframes["movies"], on="DropID", how="left")
-        .merge(dataframes["sites"], on="SiteID", how="left")
-        .merge(dataframes["surveys"], on="SurveyID", how="left")
-        .merge(dataframes["species"], on="scientificName", how="left")
-    )
-
-    # Export processed annotations to CSV
-    annotations_df.to_csv("processed_annotations.csv", index=False)
-
-    return annotations_df
+        return processed_annotations_df
+    except Exception as process_error:
+        logger.error(f"Failed to process annotations dataframe: {process_error}")
+        raise
