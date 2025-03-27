@@ -4,24 +4,18 @@ env_path = (
 )
 
 import requests
-import os
 
 # Define the URL of the script
 script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/powerbiscript/powerbi_setup/get_kso_data_from_s3.py"
 
-# Define the local path to save the script
-script_path = os.path.join(os.getcwd(), "get_kso_data_from_s3.py")
-
-# Download the script
+# Fetch the script content
 response = requests.get(script_url)
-with open(script_path, "w", encoding="utf-8") as file:
-    file.write(response.text)
 
-# Load the script
-exec(open(script_path).read())
+# Execute the script in the current namespace
+exec(response.text, globals())
 
-# Run the main function
+# Run the main function from the script
 df = main(env_path)
 
-# Ensure Power BI can read the DataFrame
-df
+# Display the first few rows
+df.head()

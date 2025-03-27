@@ -144,8 +144,19 @@ def main(env_path=None):
     }
 
     # Load AWS credentials and create S3 client
-    access_key, secret_key, bucket_name = load_aws_credentials(env_path)
-    s3_client = create_s3_client(access_key, secret_key)
+    try:
+        access_key, secret_key, bucket_name = load_aws_credentials(env_path)
+        logger.info(f"AWS Credentials loaded. Bucket: {bucket_name}")
+    except Exception as cred_error:
+        logger.error(f"Credential loading failed: {cred_error}")
+        raise
+
+    # Create S3 client
+    try:
+        s3_client = create_s3_client(access_key, secret_key)
+    except Exception as client_error:
+        logger.error(f"S3 client creation failed: {client_error}")
+        raise
 
     # Read CSV files from S3 and store in a dictionary of DataFrames
     dataframes = {}
