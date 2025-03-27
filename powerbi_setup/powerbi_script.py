@@ -1,8 +1,3 @@
-# Specify the path to your .env file
-env_path = (
-    r"C:\Users\USER\anaconda3\envs\powerbi_env\.env"  # Change this to the correct path
-)
-
 import requests
 
 # Define the URL of the script
@@ -14,8 +9,10 @@ response = requests.get(script_url)
 # Execute the script in the current namespace
 exec(response.text, globals())
 
+# Specify the path to your .env file
+env_path = (
+    r"C:\Users\USER\anaconda3\envs\powerbi_env\.env"  # Change this to the correct path
+)
+
 # Run the main function from the script
 df = main(env_path)
-
-# Display the first few rows
-df.head()

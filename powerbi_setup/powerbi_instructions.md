@@ -34,6 +34,7 @@ Create a ".env" file:
 Open a text editor and create a .env file with your AWS credentials in the following format:
 AWS_ACCESS_KEY_ID='your_access_key'
 AWS_SECRET_ACCESS_KEY='your_secret_key'
+S3_BUCKET='bucket-name'
 
 Save the file as ".env" (including the quotes) in the same location as the anaconda environment (e.g. C:\Users\YourUsername\Anaconda3\envs\powerbi_env\.env).
 

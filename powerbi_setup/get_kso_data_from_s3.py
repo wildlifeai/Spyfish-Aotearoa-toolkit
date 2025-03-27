@@ -206,7 +206,3 @@ def main(env_path=None):
     annotations_df.to_csv("processed_annotations.csv", index=False)
 
     return annotations_df
-
-
-if __name__ == "__main__":
-    main()
