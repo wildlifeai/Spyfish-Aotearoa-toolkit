@@ -161,7 +161,13 @@ def main(env_path=None):
     # Read CSV files from S3 and store in a dictionary of DataFrames
     dataframes = {}
     for name, key in csv_keys.items():
-        dataframes[name] = read_csv_from_s3(s3_client, bucket_name, key)
+        try:
+            logger.info(f"Attempting to read {name} from S3")
+            dataframes[name] = read_csv_from_s3(s3_client, bucket_name, key)
+            logger.info(f"Successfully read {name}. Shape: {dataframes[name].shape}")
+        except Exception as read_error:
+            logger.error(f"Failed to read {name}: {read_error}")
+            raise
 
     # Calculate the max count per movie, annotator and species
     max_count_df = (
