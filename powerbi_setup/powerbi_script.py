@@ -15,4 +15,4 @@ env_path = (
 )
 
 # Run the main function from the script
-df = main(env_path)
+main(env_path)
