@@ -177,7 +177,11 @@ def main(env_path=None):
         )
         return (
             processed_annotations_df,
-            dataframes["movies"],
+            dataframes["movies"].merge(
+                dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
+                on="SiteID",
+                how="left",
+            ),
             dataframes["sites"],
             dataframes["surveys"],
             dataframes["species"],
