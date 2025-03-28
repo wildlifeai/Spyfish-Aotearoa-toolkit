@@ -53,3 +53,29 @@
 2025-03-28 13:08:01,237 - get_kso_data_from_s3 - INFO - Successfully read species. Shape: (195, 7)
 2025-03-28 13:08:01,247 - get_kso_data_from_s3 - INFO - Successfully processed annotations dataframe. Shape: (126, 76)
 2025-03-28 13:08:01,252 - get_kso_data_from_s3 - INFO - Processed annotations dataframe saved to 'processed_annotations.csv'
+2025-03-28 13:12:36,603 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
+2025-03-28 13:12:36,872 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3
+2025-03-28 13:12:38,374 - get_kso_data_from_s3 - INFO - Successfully read annotations. Shape: (1595, 7)
+2025-03-28 13:12:38,390 - get_kso_data_from_s3 - INFO - Attempting to read movies from S3
+2025-03-28 13:12:38,504 - get_kso_data_from_s3 - INFO - Successfully read movies. Shape: (567, 25)
+2025-03-28 13:12:38,504 - get_kso_data_from_s3 - INFO - Attempting to read sites from S3
+2025-03-28 13:12:38,583 - get_kso_data_from_s3 - INFO - Successfully read sites. Shape: (559, 17)
+2025-03-28 13:12:38,583 - get_kso_data_from_s3 - INFO - Attempting to read surveys from S3
+2025-03-28 13:12:38,639 - get_kso_data_from_s3 - INFO - Successfully read surveys. Shape: (57, 27)
+2025-03-28 13:12:38,639 - get_kso_data_from_s3 - INFO - Attempting to read species from S3
+2025-03-28 13:12:38,702 - get_kso_data_from_s3 - INFO - Successfully read species. Shape: (195, 7)
+2025-03-28 13:12:38,708 - get_kso_data_from_s3 - INFO - Successfully processed annotations dataframe. Shape: (126, 76)
+2025-03-28 13:12:38,720 - get_kso_data_from_s3 - INFO - Processed annotations dataframe saved to 'processed_annotations.csv'
+2025-03-28 13:13:45,592 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
+2025-03-28 13:13:45,659 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3
+2025-03-28 13:13:46,736 - get_kso_data_from_s3 - INFO - Successfully read annotations. Shape: (1595, 7)
+2025-03-28 13:13:46,737 - get_kso_data_from_s3 - INFO - Attempting to read movies from S3
+2025-03-28 13:13:46,865 - get_kso_data_from_s3 - INFO - Successfully read movies. Shape: (567, 25)
+2025-03-28 13:13:46,866 - get_kso_data_from_s3 - INFO - Attempting to read sites from S3
+2025-03-28 13:13:46,954 - get_kso_data_from_s3 - INFO - Successfully read sites. Shape: (559, 17)
+2025-03-28 13:13:46,955 - get_kso_data_from_s3 - INFO - Attempting to read surveys from S3
+2025-03-28 13:13:47,051 - get_kso_data_from_s3 - INFO - Successfully read surveys. Shape: (57, 27)
+2025-03-28 13:13:47,052 - get_kso_data_from_s3 - INFO - Attempting to read species from S3
+2025-03-28 13:13:47,124 - get_kso_data_from_s3 - INFO - Successfully read species. Shape: (195, 7)
+2025-03-28 13:13:47,132 - get_kso_data_from_s3 - INFO - Successfully processed annotations dataframe. Shape: (126, 76)
+2025-03-28 13:13:47,137 - get_kso_data_from_s3 - INFO - Processed annotations dataframe saved to 'processed_annotations.csv'
