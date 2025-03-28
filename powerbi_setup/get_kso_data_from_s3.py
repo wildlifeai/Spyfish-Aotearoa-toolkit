@@ -186,7 +186,13 @@ def main(env_path=None):
         surveys_df = dataframes["surveys"]
         species_df = dataframes["species"]
 
-        return processed_annotations_df, movies_df, sites_df, surveys_df, species_df
+        return {
+            "processed_annotations": processed_annotations_df,
+            "movies": movies_df,
+            "sites": sites_df,
+            "surveys": surveys_df,
+            "species": species_df,
+        }
 
     except Exception as process_error:
         logger.error(f"Failed to process annotations dataframe: {process_error}")
