@@ -15,4 +15,4 @@ env_path = (
 )
 
 # Run the main function from the script
-main(env_path)
+processed_annotations_df, movies_df, sites_df, surveys_df, species_df = main(env_path)

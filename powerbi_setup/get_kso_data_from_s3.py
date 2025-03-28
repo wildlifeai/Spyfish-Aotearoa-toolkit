@@ -175,28 +175,13 @@ def main(env_path=None):
         logger.info(
             f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
         )
-
-        # Export processed annotations to CSV
-        processed_annotations_df.to_csv("processed_annotations.csv", index=False)
-        logger.info(
-            "Processed annotations dataframe saved to 'processed_annotations.csv'"
+        return (
+            processed_annotations_df,
+            dataframes["movies"],
+            dataframes["sites"],
+            dataframes["surveys"],
+            dataframes["species"],
         )
-        dataframes["movies"].to_csv("movies_df.csv", index=False)
-        logger.info("BUV drops dataframe saved to 'movies_df.csv'")
-        dataframes["sites"].to_csv("sites_df.csv", index=False)
-        logger.info("Sites dataframe saved to 'sites_df.csv'")
-        dataframes["surveys"].to_csv("surveys_df.csv", index=False)
-        logger.info("Surveys dataframe saved to 'surveys_df.csv'")
-        dataframes["Species"].to_csv("species_df.csv", index=False)
-        logger.info("Species dataframe saved to 'species_df.csv'")
-
-        return {
-            "processed_annotations": processed_annotations_df,
-            "movies": dataframes["movies"],
-            "sites": dataframes["sites"],
-            "surveys": dataframes["surveys"],
-            "species": dataframes["species"],
-        }
 
     except Exception as process_error:
         logger.error(f"Failed to process annotations dataframe: {process_error}")
