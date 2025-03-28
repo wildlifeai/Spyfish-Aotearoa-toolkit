@@ -16,3 +16,14 @@
 2025-03-28 12:58:09,659 - get_kso_data_from_s3 - ERROR - Failed to read annotations: Could not download or read file spyfish_metadata/kso_csvs/annotations_buv_doc.csv
 2025-03-28 12:58:24,560 - get_kso_data_from_s3 - INFO - AWS Credentials loaded. Bucket: marine-buv
 2025-03-28 12:58:24,567 - get_kso_data_from_s3 - INFO - Attempting to read annotations from S3
+2025-03-28 12:58:25,509 - get_kso_data_from_s3 - INFO - Successfully read annotations. Shape: (1595, 7)
+2025-03-28 12:58:25,510 - get_kso_data_from_s3 - INFO - Attempting to read movies from S3
+2025-03-28 12:58:25,643 - get_kso_data_from_s3 - INFO - Successfully read movies. Shape: (567, 25)
+2025-03-28 12:58:25,644 - get_kso_data_from_s3 - INFO - Attempting to read sites from S3
+2025-03-28 12:58:25,736 - get_kso_data_from_s3 - INFO - Successfully read sites. Shape: (559, 17)
+2025-03-28 12:58:25,737 - get_kso_data_from_s3 - INFO - Attempting to read surveys from S3
+2025-03-28 12:58:25,799 - get_kso_data_from_s3 - INFO - Successfully read surveys. Shape: (57, 27)
+2025-03-28 12:58:25,800 - get_kso_data_from_s3 - INFO - Attempting to read species from S3
+2025-03-28 12:58:25,861 - get_kso_data_from_s3 - INFO - Successfully read species. Shape: (195, 7)
+2025-03-28 12:58:25,885 - get_kso_data_from_s3 - INFO - Successfully processed annotations dataframe. Shape: (126, 76)
+2025-03-28 12:58:25,892 - get_kso_data_from_s3 - INFO - Processed annotations dataframe saved to 'processed_annotations.csv'
