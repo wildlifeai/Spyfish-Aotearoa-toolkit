@@ -1,0 +1,5 @@
+DropID,ScientificName,TimeOfMax,MaxInterval,AnnotatedBy,IntervalAnnotation,ConfidenceAgreement
+ABC_20250101_BUV_ABC_004_01,Squalus acanthias,00:12:22,2,expert,30,NA
+ABC_20250101_BUV_ABC_004_01,Squalus acanthias,00:12:47,2,expert,30,NA
+XYZ_20241201_BUV_XYZ_017_01,Parapercis colias,00:02:57,1,expert,30,NA
+XYZ_20241201_BUV_XYZ_017_01,Parapercis colias,00:03:00,1,expert,30,NA
