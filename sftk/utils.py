@@ -17,11 +17,9 @@ def flatten_list(lst: list[list]) -> list:
     return flattened
 
 
-def read_file_to_df(file_path: str, sheet_name: str = None):
+def read_file_to_df(file_path: str, sheet_name: str | int | list | None = 0):
+    """Reads a CSV or Excel file into a Pandas DataFrame."""
     # TODO add tests
-    # TODO add failure protection
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
-    else: 
-        # TODO does it work with None as default? 
-        return pd.read_excel(file_path, sheet_name=sheet_name)
+    return pd.read_excel(file_path, sheet_name=sheet_name)
