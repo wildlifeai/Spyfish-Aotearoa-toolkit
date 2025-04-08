@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 
 def flatten_list(lst: list[list]) -> list:
@@ -23,3 +24,8 @@ def read_file_to_df(file_path: str, sheet_name: str | int | list | None = 0):
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
     return pd.read_excel(file_path, sheet_name=sheet_name)
+
+
+
+def is_format_match(pattern, string):
+    return bool(re.match(pattern, string))   
