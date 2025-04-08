@@ -17,9 +17,15 @@ def flatten_list(lst: list[list]) -> list:
     return flattened
 
 
-def read_file_to_df(file_path: str, sheet_name: str | int | list | None = 0):
-    """Reads a CSV or Excel file into a Pandas DataFrame."""
+def read_file_to_df(file_path: str, sheet_name: str | int | list | None = 0) -> pd.DataFrame | dict:
+    """Reads a CSV or Excel file into a Pandas DataFrame.
+    
+    If you don't know the name of your sheet, you can set sheet_name=None which
+    returns a dictionary with all the sheet names as keys and content of each 
+    sheet in dfs as values. Usign <output>.keys() outputs all the sheet names.
+    """
     # TODO add tests
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
     return pd.read_excel(file_path, sheet_name=sheet_name)
+
