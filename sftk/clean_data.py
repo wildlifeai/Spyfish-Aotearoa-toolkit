@@ -55,7 +55,6 @@ class ScientificNameProcessing:
         if not cleaned_name:
             return self.failed_to_process(f"{self.scientific_name_to_check}, {self.common_name} was not processed, not a valid string.", "invalid name")
 
-        # TODO: what if there are multiple species? what does offset 1 do?
         api_url = f"https://www.marinespecies.org/rest/AphiaRecordsByName/{cleaned_name}"
 
         params = { 
@@ -71,7 +70,6 @@ class ScientificNameProcessing:
         if response.status_code != 200:
             return self.failed_to_process(f"No results found for scientific name {self.scientific_name_to_check}, {self.common_name}  API request failed with status code {response.status_code}.", "api error")
         
-        
         try: 
             response_json = response.json()
             if len(response_json) > 1: 
@@ -79,8 +77,7 @@ class ScientificNameProcessing:
                 # Example to use to get multiple results: Chrysophrys auratus
                 logging.warning(f"Multiple results found for {self.scientific_name_to_check}, {self.common_name} if that's not expected, check it here: {response_json}")
             response_json = response_json[0]
-        except Exception as e: 
-            logging.warning(f"No results found for scientific name {self.scientific_name_to_check}, {self.common_name} due to following Exception {e}")
+        except (ValueError, IndexError, TypeError) as e: 
             return self.failed_to_process(f"No results found for scientific name {self.scientific_name_to_check}, {self.common_name}.", "no results")
         
         
