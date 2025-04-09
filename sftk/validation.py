@@ -293,8 +293,8 @@ class SharepointValidator(Validator):
 
     def validate(self, data):
         summary = super().validate(data)
-        # Check reference integrity
-        # TODO: Implement reference integrity check
+        # TODO: Implement reference integrity check here!!
+        # Must be done AFTERWARDS as it involves checking references across multiple csv files
         return summary
 
     def teardown(self):
