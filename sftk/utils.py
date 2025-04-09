@@ -32,4 +32,13 @@ def read_file_to_df(file_path: str, sheet_name: str | int | list | None = 0) -> 
 
 
 def is_format_match(pattern, string):
-    return bool(re.match(pattern, string))   
+    """Checks if a string matches a regex pattern.
+
+    Args:
+        pattern (str): The regex pattern to match against.
+        string (str): The string to check.
+
+    Returns:
+        bool: True if the string matches the pattern, False otherwise.
+    """
+    return bool(re.fullmatch(pattern, string))   
