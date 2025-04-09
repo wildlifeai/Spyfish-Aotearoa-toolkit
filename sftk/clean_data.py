@@ -17,10 +17,15 @@ class ScientificNameEntry:
 class ScientificNameProcessing:
     """Class species information from the WoRMS API."""
 
-
     def __init__(self,
             scientific_name_to_check: Optional[str] = None, 
             common_name: Optional[str] = None):
+        """Initialize a ScientificNameProcessing instance.
+
+        Args:
+            scientific_name_to_check (Optional[str], optional): Scientific name to validate. Defaults to None.
+            common_name (Optional[str], optional): Common name of the species. Defaults to None.
+        """
         self.common_name = common_name
         self.scientific_name_to_check = scientific_name_to_check
         self.higher_taxon = ""
@@ -74,8 +79,9 @@ class ScientificNameProcessing:
                 # Example to use to get multiple results: Chrysophrys auratus
                 logging.warning(f"Multiple results found for {self.scientific_name_to_check}, {self.common_name} if that's not expected, check it here: {response_json}")
             response_json = response_json[0]
-        except: 
-            return self.failed_to_process(f"No results found for scientific name {self.scientific_name_to_check}, {self.common_name} empty API response.", "no results")
+        except Exception as e: 
+            logging.warning(f"No results found for scientific name {self.scientific_name_to_check}, {self.common_name} due to following Exception {e}")
+            return self.failed_to_process(f"No results found for scientific name {self.scientific_name_to_check}, {self.common_name}.", "no results")
         
         
 
