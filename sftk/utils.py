@@ -25,7 +25,6 @@ def read_file_to_df(file_path: str, sheet_name: str | int | list | None = 0) -> 
     returns a dictionary with all the sheet names as keys and content of each 
     sheet in dfs as values. Usign <output>.keys() outputs all the sheet names.
     """
-    # TODO add tests
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
     return pd.read_excel(file_path, sheet_name=sheet_name)
