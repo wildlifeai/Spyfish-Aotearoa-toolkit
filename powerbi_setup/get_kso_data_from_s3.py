@@ -5,16 +5,6 @@ import boto3
 from dotenv import load_dotenv
 import pandas as pd
 
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("s3_data_processing.log")],
-)
-logger = logging.getLogger(__name__)
-
-
 # S3 configuration
 def load_aws_credentials(env_path):
     """
@@ -55,7 +45,7 @@ def create_s3_client(access_key, secret_key):
             "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
         )
     except Exception as e:
-        logger.error(f"Failed to create S3 client: {e}")
+        logging.error(f"Failed to create S3 client: {e}")
         raise ValueError("Unable to create S3 client. Check AWS credentials.")
 
 
@@ -76,7 +66,7 @@ def read_csv_from_s3(client, bucket, key):
         return pd.read_csv(obj["Body"], low_memory=False)
 
     except Exception as e:
-        logger.error(f"Failed to process S3 file {key}: {e}")
+        logging.error(f"Failed to process S3 file {key}: {e}")
         raise IOError(f"Could not download or read file {key}")
 
 
@@ -126,7 +116,7 @@ def process_annotations_dataframe(dataframes: Dict[str, pd.DataFrame]) -> pd.Dat
 
         return annotations_df
     except Exception as e:
-        logger.error(f"Failed to process annotations dataframe: {e}")
+        logging.error(f"Failed to process annotations dataframe: {e}")
         raise
 
 
@@ -146,33 +136,33 @@ def main(env_path=None):
     # Load AWS credentials and create S3 client
     try:
         access_key, secret_key, bucket_name = load_aws_credentials(env_path)
-        logger.info(f"AWS Credentials loaded. Bucket: {bucket_name}")
+        logging.info(f"AWS Credentials loaded. Bucket: {bucket_name}")
     except Exception as cred_error:
-        logger.error(f"Credential loading failed: {cred_error}")
+        logging.error(f"Credential loading failed: {cred_error}")
         raise
 
     # Create S3 client
     try:
         s3_client = create_s3_client(access_key, secret_key)
     except Exception as client_error:
-        logger.error(f"S3 client creation failed: {client_error}")
+        logging.error(f"S3 client creation failed: {client_error}")
         raise
 
     # Read CSV files from S3 and store in a dictionary of DataFrames
     dataframes = {}
     for name, key in csv_keys.items():
         try:
-            logger.info(f"Attempting to read {name} from S3")
+            logging.info(f"Attempting to read {name} from S3")
             dataframes[name] = read_csv_from_s3(s3_client, bucket_name, key)
-            logger.info(f"Successfully read {name}. Shape: {dataframes[name].shape}")
+            logging.info(f"Successfully read {name}. Shape: {dataframes[name].shape}")
         except Exception as read_error:
-            logger.error(f"Failed to read {name}: {read_error}")
+            logging.error(f"Failed to read {name}: {read_error}")
             raise
 
     # Process the annotations dataframe using the dedicated function
     try:
         processed_annotations_df = process_annotations_dataframe(dataframes)
-        logger.info(
+        logging.info(
             f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
         )
         return (
@@ -188,5 +178,5 @@ def main(env_path=None):
         )
 
     except Exception as process_error:
-        logger.error(f"Failed to process annotations dataframe: {process_error}")
+        logging.error(f"Failed to process annotations dataframe: {process_error}")
         raise
