@@ -44,7 +44,11 @@ Or add this line to `.bashrc` to make it permanent:
 echo 'export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit' >> ~/.bashrc
 ```
 
-###
+### Environment Variables
+Copy `.env_sample` to `.env` and fill in your own values:
+
+
+### Pre-Commit checks
 
 We set up some pre-commit checks, so run this before you contribute:
 ```
