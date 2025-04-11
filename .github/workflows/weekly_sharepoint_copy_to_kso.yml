@@ -1,8 +1,7 @@
 name: Updates kso csv files based on latest sharepoint lists export
 
 on:
-  workflow_dispatch:
-    # Allows manual triggering
+  workflow_dispatch: # Allows manual triggering
   schedule:
     # Runs every Sunday at 02:00 UTC
     - cron: '0 2 * * 0'
