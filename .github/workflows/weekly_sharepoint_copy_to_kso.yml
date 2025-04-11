@@ -32,9 +32,9 @@ jobs:
         S3_BUCKET: ${{ secrets.S3_BUCKET }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        S3_KSO_TEST_CSV : $S3_KSO_TEST_CSV
-        S3_SHAREPOINT_TEST_CSV : $S3_SHAREPOINT_TEST_CSV
-        DEV_MODE : $DEV_MODE
+        S3_KSO_TEST_CSV :  ${{ secrets.S3_KSO_TEST_CSV }}
+        S3_SHAREPOINT_TEST_CSV :  ${{ secrets.S3_SHAREPOINT_TEST_CSV }}
+        DEV_MODE : ${{ secrets.DEV_MODE }}
 
         # TODO: hold for after testing
         # S3_SHAREPOINT_MOVIE_CSV: ${{ secrets.S3_SHAREPOINT_MOVIE_CSV }}
