@@ -44,27 +44,45 @@ Or add this line to `.bashrc` to make it permanent:
 echo 'export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit' >> ~/.bashrc
 ```
 
+### Environment Variables
+Copy `.env_sample` to `.env` and fill in your own values:
+
+
+### Pre-Commit checks
+
+We set up some pre-commit checks, so run this before you contribute:
+```
+pip install pre-commit
+pre-commit install
+```
+
+
+## Collaborations/questions
+
+We are working to make our work available to anyone interested.
+Please feel free to [contact us][contact_info] if you have any questions.
+
+Take a look into existing issues (or code), and contribute any way you can.
+
+
 
 ## Metadata management
+
 
 
 ## Citation
 
 If you use this code, please cite:
 
-Anton V., Fonda K., Beran H., Marinovich J., Ladds M. (2024). Spyfish Aotearoa Toolkit. https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit
+Anton V., Fonda K., Atkin E., Beran H., Marinovich J., Ladds M. (2024). Spyfish Aotearoa Toolkit. https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit
 
-
-## Collaborations/questions
-
-We are working to make our work available to anyone interested. Please feel free to [contact us][contact_info] if you have any questions.
 
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-shield]: https://img.shields.io/github/contributors/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
-[contributors-url]: https://https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/graphs/contributors
+[contributors-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [forks-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/network/members
 [stars-shield]: https://img.shields.io/github/stars/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
