@@ -9,16 +9,17 @@ Steps:
     - Update KSO-formatted data with latest sharepoint copy data
 """
 
-import os
 import logging
-from typing import Optional, cast
-from dataclasses import dataclass
+import os
 from contextlib import contextmanager
-import boto3
+from dataclasses import dataclass
+from typing import cast
+from typing import Optional
 
-from tqdm import tqdm
-from dotenv import load_dotenv
+import boto3
 import pandas as pd
+from dotenv import load_dotenv
+from tqdm import tqdm
 
 # Set up logging
 logging.basicConfig(
@@ -44,6 +45,11 @@ S3_KSO_SURVEY_CSV = os.getenv("S3_KSO_SURVEY_CSV")
 S3_KSO_SITE_CSV = os.getenv("S3_KSO_SITE_CSV")
 S3_KSO_ANNOTATIONS_CSV = os.getenv("S3_KSO_ANNOTATIONS_CSV")
 S3_KSO_SPECIES_CSV = os.getenv("S3_KSO_SPECIES_CSV")
+
+
+DEV_MODE = os.getenv("DEV_MODE")
+S3_SHAREPOINT_TEST_CSV = os.getenv("S3_SHAREPOINT_TEST_CSV")
+S3_KSO_TEST_CSV = os.getenv("S3_KSO_TEST_CSV")
 
 
 @dataclass
@@ -356,7 +362,7 @@ def validate_and_filter_dfs(
 
 
 def standarise_sharepoint_to_kso(
-    results: dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]]
+    results: dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]],
 ) -> dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]]:
     """
     Standardise and integrate data from SharePoint copies to align with KSO data structure.
@@ -587,6 +593,7 @@ def compare_and_update_dataframes(
         "site": "SiteID",
         "movie": "DropID",
         "species": "species_id",
+        "test": "SurveyID",
     }
 
     column_mappings = {
@@ -594,6 +601,7 @@ def compare_and_update_dataframes(
         "site": {},
         "movie": {"ID": "id"},
         "species": {"DOC_TaxonID": "species_id"},
+        "test": {},
     }
 
     # Validate input
@@ -756,6 +764,9 @@ def main():
     """Main function to process each sharepoint list and update KSO data if needed."""
     logging.info("Starting main function")
     keywords = ["survey", "site", "movie", "species"]
+    if DEV_MODE:
+        keywords = ["test"]
+
     logging.info(f"Processing csv files in S3 with the following keywords: {keywords}")
 
     try:
