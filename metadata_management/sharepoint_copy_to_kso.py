@@ -9,8 +9,6 @@ Steps:
     - Update KSO-formatted data with latest sharepoint copy data
 """
 
-from __future__ import annotations
-
 import logging
 import os
 from contextlib import contextmanager
