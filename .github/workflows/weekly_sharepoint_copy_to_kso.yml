@@ -27,7 +27,7 @@ jobs:
 
     - name: Copy and format latest lists to kso csv files
       run: |
-        python metadata_management/sharepoint_to_kso.py
+        python metadata_management/sharepoint_copy_to_kso.py
       env:
         S3_BUCKET: ${{ secrets.S3_BUCKET }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
