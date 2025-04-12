@@ -12,17 +12,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-  
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           # Cache for pip dependencies
           cache: 'pip'
-  
+
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+
+      - name: Checkout docs branch
+        uses: actions/checkout@v3
+        with:
+          ref: docs
+          path: docs
 
       - name: Run generate_docs.sh
         run: |
