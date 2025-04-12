@@ -9,7 +9,7 @@ on:
 jobs:
   upload-to-s3:
     runs-on: ubuntu-latest
-    if: github.ref_name == 'workflows'
+    if: github.ref_name == 'main'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -32,17 +32,18 @@ jobs:
         S3_BUCKET: ${{ secrets.S3_BUCKET }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        DEV_MODE : ${{ vars.DEV_MODE }}
         S3_KSO_TEST_CSV :  ${{ vars.S3_KSO_TEST_CSV }}
         S3_SHAREPOINT_TEST_CSV :  ${{ vars.S3_SHAREPOINT_TEST_CSV }}
-        DEV_MODE : ${{ vars.DEV_MODE }}
-
-        # TODO: hold for after testing
-        # S3_SHAREPOINT_MOVIE_CSV: ${{ secrets.S3_SHAREPOINT_MOVIE_CSV }}
-        # S3_SHAREPOINT_SURVEY_CSV: ${{ secrets.S3_SHAREPOINT_SURVEY_CSV }}
-        # S3_SHAREPOINT_SPECIES_CSV: ${{ secrets.S3_SHAREPOINT_SPECIES_CSV }}
-        # S3_KSO_MOVIE_CSV: ${{ secrets.S3_KSO_MOVIE_CSV }}
-        # S3_SHAREPOINT_SITE_CSV: ${{ secrets.S3_SHAREPOINT_SITE_CSV }}
-        # S3_KSO_SURVEY_CSV: ${{ secrets.S3_KSO_SURVEY_CSV }}
-        # S3_KSO_SITE_CSV: ${{ secrets.S3_KSO_SITE_CSV }}
-        # S3_KSO_ANNOTATIONS_CSV: ${{ secrets.S3_KSO_ANNOTATIONS_CSV }}
-        # S3_KSO_SPECIES_CSV: ${{ secrets.S3_KSO_SPECIES_CSV }}
+        S3_SHAREPOINT_DEPLOYMENT_CSV : ${{ vars.S3_SHAREPOINT_DEPLOYMENT_CSV }}
+        S3_SHAREPOINT_DEFINITIONS_CSV : ${{ vars.S3_SHAREPOINT_DEFINITIONS_CSV }}
+        S3_SHAREPOINT_RESERVES_CSV : ${{ vars.S3_SHAREPOINT_RESERVES_CSV }}
+        S3_SHAREPOINT_MOVIE_CSV: ${{ vars.S3_SHAREPOINT_MOVIE_CSV }}
+        S3_SHAREPOINT_SURVEY_CSV: ${{ vars.S3_SHAREPOINT_SURVEY_CSV }}
+        S3_SHAREPOINT_SPECIES_CSV: ${{ vars.S3_SHAREPOINT_SPECIES_CSV }}
+        S3_SHAREPOINT_SITE_CSV: ${{ vars.S3_SHAREPOINT_SITE_CSV }}
+        S3_KSO_MOVIE_CSV: ${{ vars.S3_KSO_MOVIE_CSV }}
+        S3_KSO_SURVEY_CSV: ${{ vars.S3_KSO_SURVEY_CSV }}
+        S3_KSO_SITE_CSV: ${{ vars.S3_KSO_SITE_CSV }}
+        S3_KSO_ANNOTATIONS_CSV: ${{ vars.S3_KSO_ANNOTATIONS_CSV }}
+        S3_KSO_SPECIES_CSV: ${{ vars.S3_KSO_SPECIES_CSV }}
