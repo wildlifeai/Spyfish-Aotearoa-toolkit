@@ -23,7 +23,6 @@ Spyfish Aotearoa utilises a citizen science and machine learning approach to cla
 The Spyfish Aotearoa Toolkit (sftk) is a Python package that provides a set of tools to manage the data pipeline and management of the Spyfish Aotearoa project.
 
 ### Usage
-
 The package is not yet installable, but you can use it by adding the root directory to your `PYTHONPATH` and importing the modules you need.
 
 ```python
@@ -44,29 +43,58 @@ Or add this line to `.bashrc` to make it permanent:
 echo 'export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit' >> ~/.bashrc
 ```
 
+
+
 ### Environment Variables
 Copy `.env_sample` to `.env` and fill in your own values:
+
+
+
+## Collaborations
+
+We are working to make our work available to anyone interested.
+Take a look into existing [issues][issues-url] (or code), and contribute any way you can.
+
+
+
+Feel free to [contact us][contact_info], if you have any questions.
+
 
 
 ### Pre-Commit checks
 
 We set up some pre-commit checks, so run this before you contribute:
-```
-pip install pre-commit
+```bash
+pip install pre-commit # only the first time
 pre-commit install
 ```
 
+This will fix/change/flag any issues defined in our pre-commit config.
+You need to re add any changes performed by the pre-commit.
 
-## Collaborations/questions
 
-We are working to make our work available to anyone interested.
-Please feel free to [contact us][contact_info] if you have any questions.
+Make sure your code is up to standard, but if the existing code is showing too many errors, feel free to skip it by adding `--no-verify`:
+```bash
+git commit --no-verify -m "message"
+```
 
-Take a look into existing issues (or code), and contribute any way you can.
+You can run single commands, for example:
+```bash
+pre-commit run flake8
+```
+
+
+### Spelling checker
+Please install a spelling checker in your IDE of choice, for example [this one][spell-checker] VS code/Cursor.
 
 
 
 ## Metadata management
+
+
+## Questions
+
+Please feel free to [contact us][contact_info] or raise an issue, if you have any questions.
 
 
 
@@ -86,9 +114,10 @@ Anton V., Fonda K., Atkin E., Beran H., Marinovich J., Ladds M. (2024). Spyfish 
 [forks-shield]: https://img.shields.io/github/forks/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [forks-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/network/members
 [stars-shield]: https://img.shields.io/github/stars/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
-[stars-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/stargazers
+[stars-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/stargazers]
 [issues-shield]: https://img.shields.io/github/issues/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [issues-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/issues
 [license-shield]: https://img.shields.io/github/license/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [license-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/blob/main/LICENSE.txt
+[spell-checker]: https://marketplace.cursorapi.com/items?itemName=streetsidesoftware.code-spell-checker]
 [contact_info]: contact@wildlife.ai
