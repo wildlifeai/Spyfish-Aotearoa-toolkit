@@ -9,7 +9,7 @@ on:
 jobs:
   upload-to-s3:
     runs-on: ubuntu-latest
-    if: github.ref_name == 'workflow'
+    if: github.ref_name == 'workflows'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
