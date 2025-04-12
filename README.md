@@ -74,12 +74,12 @@ You need to re add any changes performed by the pre-commit.
 
 
 Make sure your code is up to standard, but if the existing code is showing too many errors, feel free to skip it by adding `--no-verify`:
-```
+```bash
 git commit --no-verify -m "message"
 ```
 
 You can run single commands, for example:
-```
+```bash
 pre-commit run flake8
 ```
 
