@@ -446,10 +446,12 @@ def standarise_sharepoint_to_kso(
             columns=["orig_SiteID", "year", "Longitude", "Latitude"]
         )
 
-        # Drop the linktoMR from surveys to avoid duplication from the site df
-        survey_sharepoint_df = survey_sharepoint_df.drop(
-            columns=["LinkToMarineReserve"]
-        )
+        try:
+            survey_sharepoint_df = survey_sharepoint_df.drop(
+                columns=["LinkToMarineReserve"]
+            )
+        except KeyError:
+            logging.warning("Column 'LinkToMarineReserve' not found in survey_sharepoint_df")
 
         # Update the results dictionary with the modified site DataFrame
         results["site"] = (results["site"][0], site_sharepoint_df)
