@@ -10,7 +10,7 @@ This documentation guides you to set up the spyfish Aotearoa Dashboard in powerB
 ## Set up
 ### Connecting PowerBI to csv files in AWS
 #### Install Power BI Desktop
-#### Install Anaconda 
+#### Install Anaconda
 #### Create an Anaconda environment for the project
 Create and set up an environment for Power BI using Anaconda.
 Create a new environment:
@@ -30,13 +30,17 @@ pip install requests pandas boto3 python-dotenv matplotlib
 ```
 
 #### Safely save the AWS credentials in the Anaconda environment
-Create a ".env" file:
-Open a text editor and create a .env file with your AWS credentials in the following format:
-AWS_ACCESS_KEY_ID='your_access_key'
-AWS_SECRET_ACCESS_KEY='your_secret_key'
-S3_BUCKET='bucket-name'
+Copy the `.env_sample_powerbi` file, rename it to `.env` and replace the values there.
 
-Save the file as ".env" (including the quotes) in the same location as the anaconda environment (e.g. C:\Users\YourUsername\Anaconda3\envs\powerbi_env\.env).
+Or create an `.env` file with your AWS credentials with the following info:
+```
+AWS_ACCESS_KEY_ID=<your_access_key>
+AWS_SECRET_ACCESS_KEY=<your_secret_key>
+S3_BUCKET=<bucket-name>
+```
+Change the whole string after the equal sign, including the brackets.
+
+Save the file as `.env` in the same location as the anaconda environment (e.g. `C:\Users\<YourUsername>\Anaconda3\envs\powerbi_env\.env`).
 
 #### Open the latest PowerBI dashboard
 Download the most up-to-date "DOC Spyfish report vXXX.pbix" and run it in your computer.
@@ -57,7 +61,7 @@ In PowerBI Desktop, use the "Get Data" option and Select "More".
 
 Select "Python script" and connect to it.
 
-Copy and paste the script in the "powerbi_script.py" file within this directory. 
+Copy and paste the script in the "powerbi_script.py" file within this directory.
 
 IMPORTANT: Before running the script, change the first line of code to specify the path to your .env file
 <img src="https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/main/screenshot_python_script_options_powerbi.png?raw=true" width="500" alt="loaded_datasets"  />
