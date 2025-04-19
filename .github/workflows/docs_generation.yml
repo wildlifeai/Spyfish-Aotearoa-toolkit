@@ -1,6 +1,7 @@
 name: Generate Documentation
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -17,7 +18,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          # Cache for pip dependencies
           cache: 'pip'
 
       - name: Install dependencies
@@ -25,20 +25,22 @@ jobs:
           pip install -r requirements.txt
 
       - name: Checkout docs branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: docs
-          path: docs
+          # path: docs
+          fetch-depth: 0
 
       - name: Run generate_docs.sh
         run: |
           chmod +x ./generate_docs.sh
-          ./generate_docs.sh
+          ./generate_docs.sh  # Should write output to ./docs/
 
-      - name: Commit generated docs to the repo
+      - name: Commit generated docs to docs branch
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/
-          git commit -m "Update generated docs"
+          cd docs
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update generated docs" || echo "No changes to commit"
           git push origin docs
