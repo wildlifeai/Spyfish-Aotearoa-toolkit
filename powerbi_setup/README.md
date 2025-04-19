@@ -48,13 +48,11 @@ Download the most up-to-date "DOC Spyfish report vXXX.pbix" and run it in your c
 #### Link PowerBI to the Python's version of the Anaconda environment
 Configure PowerBI to use the right Python environment. In Power BI Desktop:
 
-Go to File > Options and Settings> Options
-<img src="https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/main/screenshot_landing_page_options_powerbi.png?raw=true" width="500" alt="loaded_datasets"  />
+Go to File > Options and Settings> Options > Python scripting
 
-Navigate to Python scripting
-<img src="https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/main/screenshot_python_script_options_powerbi.png?raw=true" width="500" alt="loaded_datasets"  />
+<img src="img/screenshot_python_script_options_powerbi.png?raw=true" width="500" alt="python_scripting_options"/>
 
-Set the Python home directory to your anaconda environment's path (e.g. C:\Users\YourUsername\Anaconda3\envs\powerbi_env)
+Set the Python home directory to your anaconda environment's path (e.g. `C:\Users\<YourUsername>\Anaconda3\envs\powerbi_env`)
 
 ### Read the csv files from AWS as datasets in PowerBI
 In PowerBI Desktop, use the "Get Data" option and Select "More".
@@ -64,7 +62,6 @@ Select "Python script" and connect to it.
 Copy and paste the script in the "powerbi_script.py" file within this directory.
 
 IMPORTANT: Before running the script, change the first line of code to specify the path to your .env file
-<img src="https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/main/screenshot_python_script_options_powerbi.png?raw=true" width="500" alt="loaded_datasets"  />
 
 
 Click OK.
@@ -72,15 +69,16 @@ Click OK.
 
 You should see the available datasets. Like in the screenshot below
 
-<img src="https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/main/screenshot_python_script_options_powerbi.png?raw=true" width="500" alt="loaded_datasets"  />
+
+<img src="img/navigator_display_datasets_lodaded.png?raw=true" width="500" alt="loaded_datasets"/>
 
 Check the format is correct by previewing the data and "Load" them into PowerBI.
 
-<img src="https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/main/screenshot_python_script_options_powerbi.png?raw=true" width="500" alt="loaded_datasets"  />
+<img src="img/navigator_display_datasets_preview.png?raw=true" width="500" alt="loaded_datasets"/>
 
 
 
 ## Citation
 
 If you use this code, please cite:
-Anton V., Fonda K., Beran H., Marinovich J., Ladds M. (2025). Spyfish Aotearoa Toolkit. https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit
+Anton V., Bouzaid C., Fonda K., Beran H., Marinovich J., Ladds M. (2025). Spyfish Aotearoa Toolkit. https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/powerbi_setup
