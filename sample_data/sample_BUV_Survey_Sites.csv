@@ -1,0 +1,3 @@
+SiteID,Region,LinkToMarineReserve,SiteName,SiteCode,SiteExposure,ProtectionStatus,ProtectionStatusDetails,IsControlSite,ControlToMR01,ControlToMR02,ControlToMR03,Latitude,Longitude,geodeticDatum,countryCode
+ABC_004,Auckland,ABC Marine Reserve,18,18c,Exposed,No protection,,FALSE,ABC Marine Reserve,,,-41.2898056,174.7749949,,
+XYZ_017,Auckland,XYZ High Protection Area,,,,No protection,,TRUE,XYZa High Protection Area,XYZb High Protection Area,,-41.2878056,174.8749949,,NZ
