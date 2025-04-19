@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module sftk.clean_data</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="sftk.html" class="white">sftk</a>.clean_data</strong></td>
+<td class="extra"><a href=".">index</a><br></td></tr></table>
+    <p></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="requests.html">requests</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="sftk.clean_data.html#ScientificNameEntry">ScientificNameEntry</a>
+</dt><dt class="heading-text"><a href="sftk.clean_data.html#ScientificNameProcessing">ScientificNameProcessing</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ScientificNameEntry">class <strong>ScientificNameEntry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ScientificNameEntry">ScientificNameEntry</a>(aphia_id:&nbsp;int&nbsp;=&nbsp;-1,&nbsp;common_name:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;scientific_name:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;scientific_name_to_check:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;scientific_names_match:&nbsp;bool&nbsp;=&nbsp;False,&nbsp;taxon_rank:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;status:&nbsp;str&nbsp;=&nbsp;'unprocessed')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+<a href="#ScientificNameEntry">ScientificNameEntry</a>(aphia_id:&nbsp;int&nbsp;=&nbsp;-1,&nbsp;common_name:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;scientific_name:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;scientific_name_to_check:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;scientific_names_match:&nbsp;bool&nbsp;=&nbsp;False,&nbsp;taxon_rank:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;status:&nbsp;str&nbsp;=&nbsp;'unprocessed')<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ScientificNameEntry-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ScientificNameEntry-__init__"><strong>__init__</strong></a>(self, aphia_id: int = -1, common_name: Optional[str] = None, scientific_name: Optional[str] = None, scientific_name_to_check: Optional[str] = None, scientific_names_match: bool = False, taxon_rank: Optional[str] = None, status: str = 'unprocessed') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ScientificNameEntry-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'aphia_id': &lt;class 'int'&gt;, 'common_name': typing.Optional[str], 'scientific_name': typing.Optional[str], 'scientific_name_to_check': typing.Optional[str], 'scientific_names_match': &lt;class 'bool'&gt;, 'status': &lt;class 'str'&gt;, 'taxon_rank': typing.Optional[str]}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'aphia_id': Field(name='aphia_id',type=&lt;class 'int'&gt;,default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'common_name': Field(name='common_name',type=typing.Optional[st...appingproxy({}),kw_only=False,_field_type=_FIELD), 'scientific_name': Field(name='scientific_name',type=typing.Optiona...appingproxy({}),kw_only=False,_field_type=_FIELD), 'scientific_name_to_check': Field(name='scientific_name_to_check',type=typin...appingproxy({}),kw_only=False,_field_type=_FIELD), 'scientific_names_match': Field(name='scientific_names_match',type=&lt;class ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type=&lt;class 'str'&gt;,default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'taxon_rank': Field(name='taxon_rank',type=typing.Optional[str...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('aphia_id', 'common_name', 'scientific_name', 'scientific_name_to_check', 'scientific_names_match', 'taxon_rank', 'status')</dl>
+
+<dl><dt><strong>aphia_id</strong> = -1</dl>
+
+<dl><dt><strong>common_name</strong> = None</dl>
+
+<dl><dt><strong>scientific_name</strong> = None</dl>
+
+<dl><dt><strong>scientific_name_to_check</strong> = None</dl>
+
+<dl><dt><strong>scientific_names_match</strong> = False</dl>
+
+<dl><dt><strong>status</strong> = 'unprocessed'</dl>
+
+<dl><dt><strong>taxon_rank</strong> = None</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ScientificNameProcessing">class <strong>ScientificNameProcessing</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ScientificNameProcessing">ScientificNameProcessing</a>(scientific_name_to_check:&nbsp;Optional[str]&nbsp;=&nbsp;None,&nbsp;common_name:&nbsp;Optional[str]&nbsp;=&nbsp;None)<br>
+&nbsp;<br>
+Class&nbsp;species&nbsp;information&nbsp;from&nbsp;the&nbsp;WoRMS&nbsp;API.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ScientificNameProcessing-__init__"><strong>__init__</strong></a>(self, scientific_name_to_check: Optional[str] = None, common_name: Optional[str] = None)</dt><dd><span class="code">Initialize&nbsp;a&nbsp;<a href="#ScientificNameProcessing">ScientificNameProcessing</a>&nbsp;instance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;scientific_name_to_check&nbsp;(Optional[str],&nbsp;optional):&nbsp;Scientific&nbsp;name&nbsp;to&nbsp;validate.&nbsp;Defaults&nbsp;to&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;common_name&nbsp;(Optional[str],&nbsp;optional):&nbsp;Common&nbsp;name&nbsp;of&nbsp;the&nbsp;species.&nbsp;Defaults&nbsp;to&nbsp;None.</span></dd></dl>
+
+<dl><dt><a name="ScientificNameProcessing-clean_name"><strong>clean_name</strong></a>(self)</dt><dd><span class="code">Cleans&nbsp;scientific_name_to_check&nbsp;and&nbsp;returns&nbsp;the&nbsp;value&nbsp;ready&nbsp;for&nbsp;query&nbsp;or&nbsp;None&nbsp;if&nbsp;invalid.</span></dd></dl>
+
+<dl><dt><a name="ScientificNameProcessing-failed_to_process"><strong>failed_to_process</strong></a>(self, message, status='failure')</dt></dl>
+
+<dl><dt><a name="ScientificNameProcessing-query_api"><strong>query_api</strong></a>(self) -&gt; sftk.clean_data.ScientificNameEntry</dt><dd><span class="code">Queries&nbsp;the&nbsp;WoRMS&nbsp;API&nbsp;and&nbsp;returns&nbsp;a&nbsp;<a href="#ScientificNameEntry">ScientificNameEntry</a>&nbsp;populated&nbsp;from&nbsp;the&nbsp;response.&nbsp;<br>
+&nbsp;<br>
+API&nbsp;reference:&nbsp;<a href="https://www.marinespecies.org/rest/">https://www.marinespecies.org/rest/</a><br>
+If&nbsp;the&nbsp;resquest&nbsp;is&nbsp;successful&nbsp;it&nbsp;populates&nbsp;all&nbsp;the&nbsp;attributes,&nbsp;if&nbsp;not,&nbsp;only&nbsp;with&nbsp;input&nbsp;info&nbsp;and&nbsp;failure&nbsp;reason.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Optional</strong> = typing.Optional</td></tr></table>
+</body></html>
