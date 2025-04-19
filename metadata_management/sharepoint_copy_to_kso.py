@@ -380,6 +380,7 @@ def standarise_sharepoint_to_kso(
         # Extract relevant DataFrames
         movie_sharepoint_df = results.get("movie", (None, None))[1]
         site_sharepoint_df = results.get("site", (None, None))[1]
+        survey_sharepoint_df = results.get("survey", (None, None))[1]
 
         if movie_sharepoint_df is None or site_sharepoint_df is None:
             logging.warning(
@@ -445,9 +446,17 @@ def standarise_sharepoint_to_kso(
             columns=["orig_SiteID", "year", "Longitude", "Latitude"]
         )
 
+        try:
+            survey_sharepoint_df = survey_sharepoint_df.drop(
+                columns=["LinkToMarineReserve"]
+            )
+        except KeyError:
+            logging.warning("Column 'LinkToMarineReserve' not found in survey_sharepoint_df")
+
         # Update the results dictionary with the modified site DataFrame
         results["site"] = (results["site"][0], site_sharepoint_df)
         results["movie"] = (results["movie"][0], movie_sharepoint_df)
+        results["survey"] = (results["survey"][0], survey_sharepoint_df)
 
         logging.info("Movie/BUV Drop coordinates have been successfully updated.")
         return results
@@ -779,10 +788,10 @@ def main():
         logging.info("S3 files were succesfully downloaded and checked.")
 
         logging.info(
-            "Formatting movie and site info from sharepoint copy to match KSO requirements..."
+            "Formatting survey, movie and site info from sharepoint copy to match KSO requirements..."
         )
         results = standarise_sharepoint_to_kso(results)
-        logging.info("movie and site info has been succesfully formatted")
+        logging.info("survey, movie and site info has been succesfully formatted")
 
         for keyword, (kso_df, sharepoint_df) in results.items():
             logging.info(f"Processing {keyword} data...")
