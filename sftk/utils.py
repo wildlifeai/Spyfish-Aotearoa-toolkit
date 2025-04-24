@@ -1,4 +1,8 @@
+import logging
+import os
 import re
+from contextlib import contextmanager
+from typing import cast
 
 import pandas as pd
 
@@ -47,3 +51,44 @@ def is_format_match(pattern, string):
     if pd.isna(string):
         return False
     return bool(re.fullmatch(pattern, string))
+
+
+class EnvironmentVariableError(Exception):
+    """Custom exception for missing environment variables."""
+
+
+def get_env_var(name: str) -> str:
+    """
+    Gets an environment variable and raises an error if not found.
+
+    Args:
+        name: The name of the environment variable.
+
+    Returns:
+        The value of the environment variable.
+
+    Raises:
+        EnvironmentVariableError: If the environment variable is not set.
+    """
+    value = os.getenv(name)
+    if value is None:
+        raise EnvironmentVariableError(f"Environment variable '{name}' not set.")
+    return cast(str, value)
+
+
+def delete_file(filename: str):
+    try:
+        if os.path.exists(filename):
+            os.remove(filename)
+    except Exception as e:  # TODO less wide exception
+        logging.error("Failed to remove (temporary) file %s: %s", filename, str(e))
+
+
+@contextmanager
+def temp_file_manager(filenames: list[str]):
+    """Context manager to handle temporary file cleanup."""
+    try:
+        yield
+    finally:
+        for filename in filenames:
+            delete_file(filename)

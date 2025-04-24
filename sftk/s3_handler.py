@@ -1,13 +1,25 @@
-import boto3
 import logging
+import os
 import threading
-from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
-from sftk import log_config
+from typing import Optional
+
+import boto3
+import pandas as pd
+from tqdm import tqdm
+
+from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from sftk.utils import delete_file
+
+
+class S3FileNotFoundError(Exception):
+    """Custom exception for S3 file not found scenarios."""
+
 
 class S3Handler(object):
     """
     Singleton class for interacting with an S3 bucket.
     """
+
     _instance = None
     _lock = threading.Lock()
 
@@ -21,9 +33,11 @@ class S3Handler(object):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
-                cls._instance.s3 = boto3.client("s3",
-                                                aws_access_key_id=AWS_ACCESS_KEY_ID,
-                                                aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
+                cls._instance.s3 = boto3.client(
+                    "s3",
+                    aws_access_key_id=AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                )
                 logging.info("Created a new instance of the S3Handler class.")
 
             return cls._instance
@@ -36,3 +50,104 @@ class S3Handler(object):
             str: The string representation of the class.
         """
         return f"S3Handler({self.s3})"
+
+    # def __init__(self):
+    #     self.client = self.s3
+
+    def download_object_from_s3(
+        self, bucket: str, key: str, filename: str, version_id: str = None
+    ) -> None:
+        """
+        Downloads an object from S3 with progress bar and error handling.
+
+        Args:
+            # client (boto3.client): The S3 client.
+            bucket (str): The S3 bucket name.
+            key (str): The S3 object key.
+            filename (str): The local filename to save the object to.
+            version_id (str, optional): The version ID of the object.
+                Defaults to None.
+        """
+        try:
+            kwargs = {"Bucket": bucket, "Key": key}
+            if version_id:
+                kwargs["VersionId"] = version_id
+
+            object_size = self.s3.head_object(**kwargs)["ContentLength"]
+
+            def progress_update(bytes_transferred):
+                pbar.update(bytes_transferred)
+
+            with tqdm(
+                total=object_size, unit="B", unit_scale=True, desc=filename
+            ) as pbar:
+                self.s3.download_file(
+                    Bucket=bucket,
+                    Key=key,
+                    Filename=filename,
+                    Callback=progress_update,
+                    Config=boto3.s3.transfer.TransferConfig(use_threads=False),
+                )
+        except Exception as e:
+            logging.error("Failed to download %s from S3: %s", key, e)
+            raise
+
+    def download_and_read_s3_file(
+        self, bucket: str, key: str, filename: str
+    ) -> Optional[pd.DataFrame]:
+        """
+        Downloads an S3 object and reads it into a Pandas DataFrame.
+
+        Args:
+            s3_client: The S3 client.
+            bucket: The S3 bucket name.
+            key: The S3 object key.
+            filename: The local filename to save the downloaded object.
+
+        Returns:
+            The DataFrame read from the downloaded file, or None if an error occurs.
+
+        Raises:
+            S3FileNotFoundError: If the S3 object is not found.
+            Other exceptions: If other errors occur during download or reading.
+        """
+
+        try:
+            self.download_object_from_s3(bucket=bucket, key=key, filename=filename)
+            return pd.read_csv(filename)
+        except Exception as e:
+            logging.warning("Failed to process S3 file %s: %s", key, str(e))
+            raise S3FileNotFoundError(f"Failed to process file {key}: {str(e)}")
+
+    def upload_updated_df_to_s3(
+        self, df: pd.DataFrame, bucket: str, key: str, keyword: str
+    ) -> None:
+        """
+        Upload an updated DataFrame to S3 with progress bar and error handling.
+
+        Args:
+            df: DataFrame to upload.
+            bucket: S3 bucket name.
+            key: S3 key for the file.
+            keyword: String identifier for the type of data (e.g., "survey", "site").
+        """
+        temp_filename = f"updated_{keyword}_kso_temp.csv"
+        try:
+            df.to_csv(temp_filename, index=True)
+            with tqdm(
+                total=os.path.getsize(temp_filename),
+                unit="B",
+                unit_scale=True,
+                desc=f"Uploading {keyword}",
+            ) as pbar:
+                self.s3.upload_file(
+                    Filename=temp_filename,
+                    Bucket=bucket,
+                    Key=key,
+                    Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
+                )
+            logging.info("Successfully uploaded updated %s data to S3", keyword)
+        except Exception as e:
+            logging.error("Failed to upload updated %s data to S3: %s", keyword, str(e))
+        finally:
+            delete_file(temp_filename)
