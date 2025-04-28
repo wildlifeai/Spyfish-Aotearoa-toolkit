@@ -51,11 +51,9 @@ class S3Handler(object):
         """
         return f"S3Handler({self.s3})"
 
-    # def __init__(self):
-    #     self.client = self.s3
 
     def download_object_from_s3(
-        self, bucket: str, key: str, filename: str, version_id: str = None
+        self, bucket: str, key: str, filename: str, version_id: Optional[str] = None
     ) -> None:
         """
         Downloads an object from S3 with progress bar and error handling.

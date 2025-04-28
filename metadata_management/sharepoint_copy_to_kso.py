@@ -135,8 +135,7 @@ def validate_and_filter_dfs(
     movie_sharepoint_df: pd.DataFrame, site_sharepoint_df: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Check for missing values in specified columns of movie and site DataFrames,
-    log the missing values, and filter them out.
+    Check for missing values in specified columns of movie and site DataFrames, log the missing values, and filter them out.
 
     Args:
         movie_sharepoint_df: DataFrame containing movie SharePoint data.
@@ -418,7 +417,8 @@ def compare_and_update_dataframes(
         "survey": {},
         "site": {},
         "movie": {"ID": "id"},
-        "species": {"DOC_TaxonID": "species_id"},  # aphiaID rather?
+        # TODO use aphiaID rather than DOC_TaxonID as unique identifier?
+        "species": {"DOC_TaxonID": "species_id"},
         "test": {},
     }
 
@@ -479,8 +479,6 @@ def compare_and_update_dataframes(
 
     # Create a copy of KSO DataFrame to modify
     updated_kso_df = kso_df.copy()
-
-    ### TODO here
 
     # Prepare DataFrames for comparison
     # 1. Use only common columns
