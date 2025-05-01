@@ -1,4 +1,5 @@
 import logging
+from typing import Iterable
 
 from sftk.common import S3_BUCKET, S3_SHAREPOINT_PATH
 from sftk.s3_handler import S3Handler
@@ -6,7 +7,10 @@ from sftk.utils import filter_file_paths_by_extension, get_unique_entries_df_col
 
 
 def get_mismatched_video_files_info(
-    csv_filename: str, csv_column: str, valid_extensions: set, output_files: bool = True
+    csv_filename: str,
+    csv_column: str,
+    valid_extensions: Iterable,
+    output_files: bool = True,
 ):
     """
     Compares video file paths from a CSV on with video files available in S3,
@@ -24,15 +28,15 @@ def get_mismatched_video_files_info(
 
     s3_handler = S3Handler()
     csv_s3_path = f"{S3_SHAREPOINT_PATH}/{csv_filename}"
-    logging.info(f"Processing CSV: {csv_s3_path}")
+    logging.info(f"Processing CSV: {csv_s3_path}.")
 
     # Load unique file paths from the CSV column
     csv_filepaths = get_unique_entries_df_column(
         csv_s3_path, csv_column, s3_handler, S3_BUCKET
     )
-    logging.info(f"Unique file paths from CSV: {len(csv_filepaths)}")
+    logging.info(f"Unique file paths from CSV: {len(csv_filepaths)}.")
 
-    logging.info(f"Processing the files in the bucket: {S3_BUCKET}")
+    logging.info(f"Processing the files in the bucket: {S3_BUCKET}.")
     # Get all file paths currently in S3
     s3_filepaths = s3_handler.get_set_filenames_from_s3(bucket=S3_BUCKET)
 
@@ -48,20 +52,20 @@ def get_mismatched_video_files_info(
 
     if output_files:
         logging.info(
-            "Creating file missing_files_in_aws.txt, containing file names of"
-            "videos referenced in CSV but not found in S3V"
+            "Creating file missing_files_in_aws.txt, containing file names of "
+            "videos referenced in CSV but not found in S3."
         )
         with open("missing_files_in_aws.txt", "w") as f:
             f.write("\n".join(sorted(missing_files_in_aws)))
 
     # Find extra files in S3 (present in S3 but not referenced in CSV)
     extra_files_in_aws = s3_video_filepaths - csv_filepaths
-    logging.info(f"Extra video files in AWS: {len(extra_files_in_aws)}")
+    logging.info(f"Extra video files in AWS: {len(extra_files_in_aws)}.")
 
     if output_files:
         logging.info(
-            "Creating file extra_files_in_aws.txt, containing file names of"
-            "videos present in S3 but not referenced in the CSV"
+            "Creating file extra_files_in_aws.txt, containing file names of "
+            "videos present in S3 but not referenced in the CSV."
         )
 
         with open("extra_files_in_aws.txt", "w") as f:
@@ -69,7 +73,7 @@ def get_mismatched_video_files_info(
 
 
 if __name__ == "__main__":
-    logging.info("Starting mismatched_video_file_info processing")
+    logging.info("Starting mismatched_video_file_info processing.")
 
     csv_filename = "BUV Deployment.csv"
     csv_column_to_extract = "LinkToVideoFile"
