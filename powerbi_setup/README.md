@@ -16,6 +16,7 @@ Create and set up an environment for Power BI using Anaconda.
 Create a new environment:
 Open Anaconda Prompt and run:
 ```Bash
+# TODO check with a higher python version
 conda create --name powerbi_env python=3.9
 ```
 
@@ -26,8 +27,10 @@ conda activate powerbi_env
 
 Install required packages:
 ```Bash
+# TODO is matplotlib even used?
 pip install requests pandas boto3 python-dotenv matplotlib
 ```
+
 
 #### Safely save the AWS credentials in the Anaconda environment
 Copy the `.env_sample_powerbi` file, rename it to `.env` and replace the values there.

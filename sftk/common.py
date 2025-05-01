@@ -13,10 +13,11 @@ def load_env_wrapper() -> None:
     if os.getenv("GITHUB_ACTIONS") == "true":
         return
 
-    load_dotenv()
+    load_dotenv(override=True)
 
 
 load_env_wrapper()
+
 
 # General settings
 DEV_MODE = os.getenv("DEV_MODE")
@@ -43,12 +44,14 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 S3_SHAREPOINT_TEST_CSV = os.getenv("S3_SHAREPOINT_TEST_CSV")
 
 S3_SHAREPOINT_DEFINITIONS_CSV = os.getenv("S3_SHAREPOINT_DEFINITIONS_CSV")
+#  TODO check if they are both used: MOVIE_CSV or DEPLOYMENT_CSV
 S3_SHAREPOINT_DEPLOYMENT_CSV = os.getenv("S3_SHAREPOINT_DEPLOYMENT_CSV")
-S3_SHAREPOINT_MOVIE_CSV = os.getenv("S3_SHAREPOINT_MOVIE_CSV")
+S3_SHAREPOINT_MOVIE_CSV = os.getenv("S3_SHAREPOINT_DEPLOYMENT_CSV")
 S3_SHAREPOINT_RESERVES_CSV = os.getenv("S3_SHAREPOINT_RESERVES_CSV")
 S3_SHAREPOINT_SITE_CSV = os.getenv("S3_SHAREPOINT_SITE_CSV")
 S3_SHAREPOINT_SPECIES_CSV = os.getenv("S3_SHAREPOINT_SPECIES_CSV")
 S3_SHAREPOINT_SURVEY_CSV = os.getenv("S3_SHAREPOINT_SURVEY_CSV")
+
 
 # S3 KSO Files
 S3_KSO_TEST_CSV = os.getenv("S3_KSO_TEST_CSV")
