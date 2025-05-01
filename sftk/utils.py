@@ -2,7 +2,7 @@ import logging
 import os
 import re
 from contextlib import contextmanager
-from typing import cast
+from typing import Iterable, List, cast
 
 import pandas as pd
 
@@ -82,6 +82,46 @@ def delete_file(filename: str):
             os.remove(filename)
     except Exception as e:  # TODO less wide exception
         logging.error("Failed to remove (temporary) file %s: %s", filename, str(e))
+
+
+def filter_file_paths_by_extension(
+    file_paths_iterable: Iterable, valid_extensions: Iterable
+) -> List[str]:
+    """
+    Filter a collection of file paths, returning only those that match the given file extensions.
+
+    Parameters:
+        file_paths_iterable Iterable: A set or list of file paths (strings) to filter.
+        valid_extensions Iterable: A list or tuple of valid file extensions (e.g., ['mp4', 'mov']).
+
+    Returns:
+        list: A list of file paths that have an extension matching one of the valid extensions.
+    """
+    filtered_file_paths = []
+
+    for file_path in file_paths_iterable:
+        # Extract the file extension (e.g., 'mp4', 'jpg'), remove the leading dot
+        ext = os.path.splitext(file_path)[-1].lower().lstrip(".")
+
+        # Include file path if its extension is in the valid list
+        if ext in valid_extensions:
+            filtered_file_paths.append(file_path)
+
+    return filtered_file_paths
+
+
+def get_unique_entries_df_column(
+    csv_filename_path, column_name_to_extract, s3_handler, bucket, drop_na=True
+) -> set:
+    buv_deployment_df = s3_handler.read_df_from_s3_csv(csv_filename_path, bucket)
+    if drop_na:
+        csv_filepaths = set(
+            buv_deployment_df[column_name_to_extract].dropna().astype(str)
+        )
+    else:
+        csv_filepaths = set(buv_deployment_df[column_name_to_extract])
+
+    return csv_filepaths
 
 
 @contextmanager

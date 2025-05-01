@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import threading
@@ -50,7 +51,6 @@ class S3Handler(object):
             str: The string representation of the class.
         """
         return f"S3Handler({self.s3})"
-
 
     def download_object_from_s3(
         self, bucket: str, key: str, filename: str, version_id: Optional[str] = None
@@ -149,3 +149,43 @@ class S3Handler(object):
             logging.error("Failed to upload updated %s data to S3: %s", keyword, str(e))
         finally:
             delete_file(temp_filename)
+
+    def get_set_filenames_from_s3(self, bucket: str, prefix: str = "") -> set[str]:
+        """
+        Retrieve a set of all object keys (file paths) in an S3 bucket under
+        a given prefix.
+
+        Parameters:
+            bucket (str): Name of the S3 bucket.
+            prefix (str, optional): Folder path within the bucket to filter
+                objects. Defaults to "" (entire bucket).
+
+        Returns:
+            set: A set of S3 object keys (strings) matching the specified prefix.
+        """
+
+        s3_filepaths = set()
+        paginator = self.s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                s3_filepaths.add(obj["Key"])
+        return s3_filepaths
+
+    def read_df_from_s3_csv(self, csv_s3_path, s3_bucket) -> pd.DataFrame:
+        """
+        Downloads a CSV file from S3 and loads it into a pandas DataFrame.
+
+        Parameters:
+            csv_filename (str): The name of the CSV file (e.g., 'data.csv').
+            csv_path (str): The S3 key prefix/path (e.g., 'folder/subfolder').
+            s3_bucket (str): The name of the S3 bucket.
+
+        Returns:
+            pd.DataFrame: The loaded DataFrame.
+        """
+        # Download the object to memory
+        response = self.s3.get_object(Bucket=s3_bucket, Key=csv_s3_path)
+
+        # TODO add this to read file function?
+        buv_deployment_df = pd.read_csv(io.BytesIO(response["Body"].read()))
+        return buv_deployment_df
