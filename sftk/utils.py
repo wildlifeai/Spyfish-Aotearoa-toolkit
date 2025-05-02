@@ -85,7 +85,7 @@ def delete_file(filename: str):
 
 
 def filter_file_paths_by_extension(
-    file_paths: Iterable, valid_extensions: Iterable
+    file_paths: Iterable[str], valid_extensions: Iterable[str]
 ) -> List[str]:
     """
     Filter a collection of file paths, returning only those that match the given file extensions.

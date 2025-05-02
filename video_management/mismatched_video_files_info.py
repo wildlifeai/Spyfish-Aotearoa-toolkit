@@ -9,7 +9,7 @@ from sftk.utils import filter_file_paths_by_extension, get_unique_entries_df_col
 def get_mismatched_video_files_info(
     csv_filename: str,
     csv_column: str,
-    valid_extensions: Iterable,
+    valid_extensions: Iterable[str],
     output_files: bool = True,
 ):
     """
@@ -17,13 +17,15 @@ def get_mismatched_video_files_info(
     identifies mismatches, and writes the results to local text files.
 
     Parameters:
-        csv_filename (str): Name of the CSV file in S3 (e.g., 'BUV Deployment.csv').
+        csv_filename (str): Name of the CSV file in S3
+            (e.g., 'BUV Deployment.csv').
         csv_column (str): Column in the CSV that contains video file paths.
-        valid_extensions (set): Set of valid video file extensions (e.g., {'mp4', 'mov'}).
+        valid_extensions (set): Set of valid video file extensions
+            (e.g., {'mp4', 'mov'}).
 
     Outputs:
-        - 'missing_files_in_aws.txt': Files listed in CSV but missing from S3
-        - 'extra_files_in_aws.txt': Files in S3 not listed in the CSV
+        - 'missing_files_in_aws.txt': Files listed in CSV but missing from S3.
+        - 'extra_files_in_aws.txt': Files in S3 not listed in the CSV.
     """
 
     s3_handler = S3Handler()

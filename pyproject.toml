@@ -51,5 +51,8 @@ python_files = ["test_*.py"]
 [tool.setuptools]
 packages = ["sftk"]
 
+[tool.isort]
+profile = "black"
+
 [project.urls]
 Homepage = "https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit"
