@@ -16,7 +16,7 @@ requires-python = ">=3.10"
 
 dependencies = [
   "boto3==1.37.17",
-  "botocore==1.37.17",
+  "botocore>=1.37.17",
   "exceptiongroup==1.2.2",
   "iniconfig==2.1.0",
   "jmespath==1.0.1",
@@ -44,9 +44,15 @@ dev = [
   "pre_commit==4.2.0"
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
 
 [tool.setuptools]
 packages = ["sftk"]
+
+[tool.isort]
+profile = "black"
 
 [project.urls]
 Homepage = "https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit"

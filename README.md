@@ -23,7 +23,19 @@ Spyfish Aotearoa utilises a citizen science and machine learning approach to cla
 The Spyfish Aotearoa Toolkit (sftk) is a Python package that provides a set of tools to manage the data pipeline and management of the Spyfish Aotearoa project.
 
 ### Usage
-The package is not yet installable, but you can use it by adding the root directory to your `PYTHONPATH` and importing the modules you need.
+
+You can install the package by running this
+
+```
+pip install "/path/to/Spyfish-Aotearoa-toolkit"
+```
+or with the dev tag, which adds a few additional development related libraries (the -e stands for editable, meaning that if you change something in the code it will be reflected in the functioning in the package).
+```
+pip install -e "/path/to/Spyfish-Aotearoa-toolkit[dev]"
+```
+
+
+You can also use the sftk package by adding the root directory to your `PYTHONPATH` and importing the modules you need.
 
 ```python
 import sys
