@@ -62,7 +62,7 @@ def get_env_var(name: str) -> str:
     Gets an environment variable and raises an error if not found.
 
     Args:
-        name: The name of the environment variable.
+        name (str): The name of the environment variable.
 
     Returns:
         The value of the environment variable.
@@ -85,21 +85,22 @@ def delete_file(filename: str):
 
 
 def filter_file_paths_by_extension(
-    file_paths_iterable: Iterable, valid_extensions: Iterable
+    file_paths: Iterable[str], valid_extensions: Iterable[str]
 ) -> List[str]:
     """
     Filter a collection of file paths, returning only those that match the given file extensions.
 
     Parameters:
-        file_paths_iterable Iterable: A set or list of file paths (strings) to filter.
-        valid_extensions Iterable: A list or tuple of valid file extensions (e.g., ['mp4', 'mov']).
+        file_paths (Iterable): A set or list of file paths (strings) to filter.
+        valid_extensions (Iterable): An iterable containing valid file
+            extensions (e.g., ['mp4', 'mov']).
 
     Returns:
         list: A list of file paths that have an extension matching one of the valid extensions.
     """
     filtered_file_paths = []
 
-    for file_path in file_paths_iterable:
+    for file_path in file_paths:
         # Extract the file extension (e.g., 'mp4', 'jpg'), remove the leading dot
         ext = os.path.splitext(file_path)[-1].lower().lstrip(".")
 
