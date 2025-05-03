@@ -1,6 +1,12 @@
+# User ignore
 .env
+data/
+# old repo, to merge relevant files with the new one
+spyfish_analysis/
+
 *__pycache__*
+*.egg-info
+
 .python-version
 .DS_Store
 .vscode/
-*.egg-info

@@ -8,7 +8,7 @@ import boto3
 import pandas as pd
 from tqdm import tqdm
 
-from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
 from sftk.utils import delete_file
 
 
@@ -53,18 +53,22 @@ class S3Handler(object):
         return f"S3Handler({self.s3})"
 
     def download_object_from_s3(
-        self, bucket: str, key: str, filename: str, version_id: Optional[str] = None
+        self,
+        key: str,
+        filename: str,
+        version_id: Optional[str] = None,
+        bucket: str = S3_BUCKET,
     ) -> None:
         """
         Downloads an object from S3 with progress bar and error handling.
 
         Args:
             # client (boto3.client): The S3 client.
-            bucket (str): The S3 bucket name.
             key (str): The S3 object key.
             filename (str): The local filename to save the object to.
             version_id (str, optional): The version ID of the object.
                 Defaults to None.
+            bucket (str): The S3 bucket name, defaults to env defined bucket.
         """
         try:
             kwargs = {"Bucket": bucket, "Key": key}
@@ -91,16 +95,16 @@ class S3Handler(object):
             raise
 
     def download_and_read_s3_file(
-        self, bucket: str, key: str, filename: str
+        self, key: str, filename: str, bucket: str = S3_BUCKET
     ) -> Optional[pd.DataFrame]:
         """
         Downloads an S3 object and reads it into a Pandas DataFrame.
 
         Args:
             s3_client: The S3 client.
-            bucket: The S3 bucket name.
             key: The S3 object key.
             filename: The local filename to save the downloaded object.
+            bucket (str): The S3 bucket name, defaults to env defined bucket.
 
         Returns:
             The DataFrame read from the downloaded file, or None if an error occurs.
@@ -111,23 +115,23 @@ class S3Handler(object):
         """
 
         try:
-            self.download_object_from_s3(bucket=bucket, key=key, filename=filename)
+            self.download_object_from_s3(key=key, filename=filename, bucket=bucket)
             return pd.read_csv(filename)
         except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
             raise S3FileNotFoundError(f"Failed to process file {key}: {str(e)}")
 
     def upload_updated_df_to_s3(
-        self, df: pd.DataFrame, bucket: str, key: str, keyword: str
+        self, df: pd.DataFrame, key: str, keyword: str, bucket: str = S3_BUCKET
     ) -> None:
         """
         Upload an updated DataFrame to S3 with progress bar and error handling.
 
         Args:
             df: DataFrame to upload.
-            bucket: S3 bucket name.
             key: S3 key for the file.
             keyword: String identifier for the type of data (e.g., "survey", "site").
+            bucket (str): The S3 bucket name, defaults to env defined bucket.
         """
         temp_filename = f"updated_{keyword}_kso_temp.csv"
         try:
@@ -150,13 +154,15 @@ class S3Handler(object):
         finally:
             delete_file(temp_filename)
 
-    def get_set_filenames_from_s3(self, bucket: str, prefix: str = "") -> set[str]:
+    def get_set_filenames_from_s3(
+        self, bucket: str = S3_BUCKET, prefix: str = ""
+    ) -> set[str]:
         """
         Retrieve a set of all object keys (file paths) in an S3 bucket under
         a given prefix.
 
         Parameters:
-            bucket (str): Name of the S3 bucket.
+            bucket (str): The S3 bucket name, defaults to env defined bucket.
             prefix (str, optional): Folder path within the bucket to filter
                 objects. Defaults to "" (entire bucket).
 
@@ -171,7 +177,9 @@ class S3Handler(object):
                 s3_filepaths.add(obj["Key"])
         return s3_filepaths
 
-    def read_df_from_s3_csv(self, csv_s3_path, s3_bucket) -> pd.DataFrame:
+    def read_df_from_s3_csv(
+        self, csv_s3_path: str, s3_bucket: str = S3_BUCKET
+    ) -> pd.DataFrame:
         """
         Downloads a CSV file from S3 and loads it into a pandas DataFrame.
 
