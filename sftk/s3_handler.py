@@ -186,7 +186,7 @@ class S3Handler(object):
         Parameters:
             csv_filename (str): The name of the CSV file (e.g., 'data.csv').
             csv_path (str): The S3 key prefix/path (e.g., 'folder/subfolder').
-            s3_bucket (str): The name of the S3 bucket.
+            s3_bucket (str): The name of the S3 bucket, defaults to env defined bucket.
 
         Returns:
             pd.DataFrame: The loaded DataFrame.
