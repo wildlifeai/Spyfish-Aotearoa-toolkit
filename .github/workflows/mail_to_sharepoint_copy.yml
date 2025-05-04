@@ -1,5 +1,5 @@
-name: Updates copies of sharepoint lists based on modifications received via email 
-
+name: Updates copies of sharepoint lists based on modifications received via email
+# TODO: not yet active/refactored as part of sftk
 on:
   workflow_dispatch:  # Add this line to enable manual triggers
 
