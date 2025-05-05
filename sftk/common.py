@@ -40,6 +40,8 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
+DATA_FOLDER_PATH = os.getenv("DATA_FOLDER_PATH")
+
 # TODO: refactor code to use only the CSV name and the S3 path
 # S3 Sharepoint Files
 S3_SHAREPOINT_PATH = "spyfish_metadata/sharepoint_lists/"
@@ -76,3 +78,11 @@ KEYWORD_LOOKUP = {
     "movie": "DropID",
     "species": "ScientificName",
 }
+
+MOVIE_EXTENSIONS = [
+    "avi",
+    "mov",
+    "mp4",
+    "mpg",
+    "wmv",
+]
