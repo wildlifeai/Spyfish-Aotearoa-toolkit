@@ -132,7 +132,6 @@ class S3Handler(object):
             key: S3 key for the file.
             keyword: String identifier for the type of data (e.g., "survey", "site").
             bucket (str): The S3 bucket name, defaults to env defined bucket.
-            bucket (str): The S3 bucket name, defaults to env defined bucket.
         """
         temp_filename = f"updated_{keyword}_kso_temp.csv"
         try:
