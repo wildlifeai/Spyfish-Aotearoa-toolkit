@@ -132,6 +132,7 @@ class S3Handler(object):
             key: S3 key for the file.
             keyword: String identifier for the type of data (e.g., "survey", "site").
             bucket (str): The S3 bucket name, defaults to env defined bucket.
+            bucket (str): The S3 bucket name, defaults to env defined bucket.
         """
         temp_filename = f"updated_{keyword}_kso_temp.csv"
         try:
@@ -159,17 +160,20 @@ class S3Handler(object):
     ) -> set[str]:
         """
         Retrieve a set of all object keys (file paths) in an S3 bucket under
-        a given prefix.
+        a given prefix, optionally filtering by file suffixes.
 
         Parameters:
             bucket (str): The S3 bucket name, defaults to env defined bucket.
             prefix (str, optional): Folder path within the bucket to filter
                 objects. Defaults to "" (entire bucket).
+            suffixes (tuple, optional): A tuple of lowercase file suffixes to
+                filter object keys (e.g., ("mp4", "jpg")). If empty, all objects
+                are returned regardless of suffix. Case-insensitive.
 
         Returns:
-            set: A set of S3 object keys (strings) matching the specified prefix.
+            set[str]: A set of S3 object keys (strings) matching the specified
+                prefix and suffixes.
         """
-
         s3_filepaths = set()
         paginator = self.s3.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
