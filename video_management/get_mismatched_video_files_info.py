@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Iterable
 
 from sftk.common import S3_BUCKET, S3_SHAREPOINT_PATH
@@ -29,7 +30,7 @@ def get_mismatched_video_files_info(
     """
 
     s3_handler = S3Handler()
-    csv_s3_path = f"{S3_SHAREPOINT_PATH}/{csv_filename}"
+    csv_s3_path = os.path.join(S3_SHAREPOINT_PATH, csv_filename)
     logging.info(f"Processing CSV: {csv_s3_path}.")
 
     # Load unique file paths from the CSV column
