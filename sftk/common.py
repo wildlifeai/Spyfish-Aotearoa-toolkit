@@ -79,4 +79,10 @@ KEYWORD_LOOKUP = {
     "species": "ScientificName",
 }
 
-MOVIE_EXTENSIONS = ["avi", "mov", "mp4", "mpg", "wmv",]
+MOVIE_EXTENSIONS = [
+    "avi",
+    "mov",
+    "mp4",
+    "mpg",
+    "wmv",
+]

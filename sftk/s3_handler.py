@@ -2,7 +2,7 @@ import io
 import logging
 import os
 import threading
-from typing import Optional
+from typing import Iterable, Optional
 
 import boto3
 import pandas as pd
@@ -10,8 +10,6 @@ from tqdm import tqdm
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
 from sftk.utils import delete_file
-
-from typing import Iterable
 
 
 class S3FileNotFoundError(Exception):
@@ -157,7 +155,7 @@ class S3Handler(object):
             delete_file(temp_filename)
 
     def get_set_filenames_from_s3(
-        self, bucket: str = S3_BUCKET, prefix: str = "", suffixes: tuple = () 
+        self, bucket: str = S3_BUCKET, prefix: str = "", suffixes: tuple = ()
     ) -> set[str]:
         """
         Retrieve a set of all object keys (file paths) in an S3 bucket under
@@ -177,32 +175,43 @@ class S3Handler(object):
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
                 # If there are no suffixes / if the path ends with one of the given suffixes
-                if not suffixes or obj["Key"].lower().endswith(tuple(suffixes)): 
+                if not suffixes or obj["Key"].lower().endswith(tuple(suffixes)):
                     s3_filepaths.add(obj["Key"])
         return s3_filepaths
-    
-    def rename_s3_objects_from_dict(self, rename_pairs: dict, prefix='', suffixes : Iterable = {}, bucket= S3_BUCKET, try_run=False):
+
+    def rename_s3_objects_from_dict(
+        self,
+        rename_pairs: dict,
+        prefix="",
+        suffixes: Iterable = {},
+        bucket=S3_BUCKET,
+        try_run=False,
+    ):
         files_from_aws = self.get_set_filenames_from_s3(bucket, prefix, suffixes)
-        
+
         for old_name, new_name in rename_pairs.items():
-            
-            if old_name in files_from_aws:   
-                try: 
-                    if not try_run: 
+
+            if old_name in files_from_aws:
+                try:
+                    if not try_run:
                         # Copy
-                        self.s3.copy_object(Bucket=bucket, CopySource={'Bucket': bucket, 'Key': old_name}, Key=new_name)
+                        self.s3.copy_object(
+                            Bucket=bucket,
+                            CopySource={"Bucket": bucket, "Key": old_name},
+                            Key=new_name,
+                        )
                         # Delete
                         self.s3.delete_object(Bucket=bucket, Key=old_name)
                 except Exception as e:
                     # TODO add tighter exception
-                    logging.warning(f"Failed to rename {old_name} to {new_name}, error: {str(e)}")
+                    logging.warning(
+                        f"Failed to rename {old_name} to {new_name}, error: {str(e)}"
+                    )
                 logging.info(f"Renamed: {old_name} ➜ {new_name}")
-            else: 
+            else:
                 logging.info(f"File not found in the {S3_BUCKET} bucket: {old_name}.")
-            
-        logging.info("Rename complete")
 
-        
+        logging.info("Rename complete")
 
     def read_df_from_s3_csv(
         self, csv_s3_path: str, s3_bucket: str = S3_BUCKET

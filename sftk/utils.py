@@ -124,6 +124,7 @@ def get_unique_entries_df_column(
 
     return csv_filepaths
 
+
 @contextmanager
 def temp_file_manager(filenames: list[str]):
     """Context manager to handle temporary file cleanup."""
