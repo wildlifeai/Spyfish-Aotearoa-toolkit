@@ -31,7 +31,7 @@ def read_file_to_df(
 
     If you don't know the name of your sheet, you can set sheet_name=None which
     returns a dictionary with all the sheet names as keys and content of each
-    sheet in dfs as values. Usign <output>.keys() outputs all the sheet names.
+    sheet in dfs as values. Using <output>.keys() outputs all the sheet names.
     """
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
