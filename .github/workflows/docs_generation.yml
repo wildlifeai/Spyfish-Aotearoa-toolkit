@@ -2,6 +2,8 @@ name: Generate Documentation
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0'
   push:
     branches:
       - main
@@ -23,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          pip install .
 
       - name: Checkout docs branch
         uses: actions/checkout@v4

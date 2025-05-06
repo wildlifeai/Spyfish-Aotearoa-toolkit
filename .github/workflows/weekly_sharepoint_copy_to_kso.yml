@@ -24,6 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
+        pip install .
 
     - name: Copy and format latest lists to kso csv files
       run: |
