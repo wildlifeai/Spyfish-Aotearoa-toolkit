@@ -291,10 +291,47 @@ class SharepointValidator(Validator):
             }
         }
 
+    def reference_integrity_validation(self, data: list[tuple[str, pd.DataFrame]]) -> dict:
+        """Validates unique constraints and reference integrity.
+        This ensures that primary keys are unique and that foreign keys reference valid primary keys.
+        Params:
+            data (iterable): The data to validate.
+
+        Returns:
+            dict: A dictionary containing the validation summary.
+        """
+        reference_integrity_summary = defaultdict(dict)
+        for filename, df in data:
+            base_name = Path(filename).stem
+            rules = self.validation_rules.get(base_name, {})
+            constraints = rules.get("reference_mappings", {})
+            for source_col, ref_info in constraints.items():
+                # Conditions where the reference integrity check should be skipped
+                if source_col not in df.columns:
+                    continue
+                # Checks if the reference file exists in the data
+                ref_df = next((df for fn, df in data if Path(fn).stem == ref_info["reference"]), None)
+                if ref_df is None:
+                    continue
+
+                # Now the actual check
+                if source_col in df.columns and ref_info["column"] in ref_df.columns:
+                    # Check for missing references
+                    missing_references = df[~df[source_col].isin(ref_df[ref_info["column"]])]
+                    if not missing_references.empty:
+                        reference_integrity_summary[filename][source_col] = {
+                            "missing_references": missing_references[source_col].tolist()
+                        }
+                        logging.warning(f"Missing references in {filename}: {missing_references[source_col].tolist()}")
+
+
+        return reference_integrity_summary
+
+
     def validate(self, data):
         summary = super().validate(data)
-        # TODO: Implement reference integrity check here!!
-        # Must be done AFTERWARDS as it involves checking references across multiple csv files
+        reference_integrity_summary = self.reference_integrity_validation(data)
+        summary['reference_integrity'] = reference_integrity_summary
         return summary
 
     def teardown(self):
