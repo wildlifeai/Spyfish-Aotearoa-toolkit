@@ -60,15 +60,11 @@ def get_s3_file_config(keyword: str) -> S3FileConfig:
     kso_env_var = f"S3_KSO_{keyword.upper()}_CSV"
     sharepoint_env_var = f"S3_SHAREPOINT_{keyword.upper()}_CSV"
 
-    # Ensure the Env vars exists
-    sharepoint_path = get_env_var(sharepoint_env_var)
-    kso_path = get_env_var(kso_env_var)
-
     return S3FileConfig(
         keyword=keyword,
-        # TODO check why env vars instead of paths? also general env var management
-        kso_env_var=kso_env_var,
-        sharepoint_env_var=sharepoint_env_var,
+        # Get env var checks if the env vars exist
+        kso_env_var=get_env_var(kso_env_var),
+        sharepoint_env_var=get_env_var(sharepoint_env_var),
         kso_filename=f"{keyword}_kso_temp.csv",
         sharepoint_filename=f"{keyword}_sharepoint_temp.csv",
     )
@@ -115,16 +111,20 @@ def process_s3_files(
                     )
 
                 except S3FileNotFoundError as e:
-                    logging.warning(
-                        "CSV file not found in S3 for keyword %s: %s", keyword, str(e)
-                    )
+                    msg = f"CSV file not found in S3 for keyword '{keyword}': {e}"
+                    logging.warning(msg)
+                    raise S3FileNotFoundError(msg) from e
+
         # TODO fix these errors and exceptions
         except EnvironmentVariableError as e:
-            logging.error(
-                "Environment variable error for keyword %s: %s", keyword, str(e)
-            )
+            msg = f"Missing environment variable for keyword '{keyword}': {e}"
+            logging.error(msg)
+            raise EnvironmentVariableError(msg) from e
+
         except Exception as e:
-            logging.error("Unexpected error processing keyword %s: %s", keyword, str(e))
+            msg = f"Unexpected error while processing keyword '{keyword}': {e}"
+            logging.error(msg)
+            raise RuntimeError(msg) from e
 
         results[keyword] = (kso_df, sharepoint_df)
 

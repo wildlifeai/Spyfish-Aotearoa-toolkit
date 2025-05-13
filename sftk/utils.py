@@ -77,11 +77,23 @@ def get_env_var(name: str) -> str:
 
 
 def delete_file(filename: str):
+    """
+    Deletes a file from the filesystem if it exists.
+
+    Args:
+        filename (str): The path to the file to delete.
+
+    Logs:
+        - A debug message if the file does not exist.
+        - An error message if the file could not be deleted due to permission or OS-related issues.
+    """
     try:
         if os.path.exists(filename):
             os.remove(filename)
-    except Exception as e:  # TODO less wide exception
-        logging.error("Failed to remove (temporary) file %s: %s", filename, str(e))
+        else:
+            logging.debug(f"File '{filename}' did not exist, nothing to delete.")
+    except (PermissionError, OSError) as e:
+        logging.error(f"Failed to remove file '{filename}': {e}")
 
 
 def filter_file_paths_by_extension(
