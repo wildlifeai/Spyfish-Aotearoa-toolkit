@@ -27,7 +27,9 @@ def sample_dataframe():
 
 def test_flatten_list_simple():
     simple_nested_list = [[1, 2], [3, 4], [5, 6]]
-    assert len(flatten_list(simple_nested_list)) == 6, "Flattened list is not the correct length"
+    assert (
+        len(flatten_list(simple_nested_list)) == 6
+    ), "Flattened list is not the correct length"
     assert flatten_list(simple_nested_list) == [
         1,
         2,
@@ -41,7 +43,9 @@ def test_flatten_list_simple():
 def test_flatten_list_nested():
     # Test with a nested (recursive) list
     nested_list = [[1, 2], [3, 4], [5, [6, 7]]]
-    assert len(flatten_list(nested_list)) == 7, "Flattened list is not the correct length"
+    assert (
+        len(flatten_list(nested_list)) == 7
+    ), "Flattened list is not the correct length"
     assert flatten_list(nested_list) == [
         1,
         2,
@@ -119,10 +123,7 @@ def test_delete_file_exception(caplog):
     with patch("os.path.exists", return_value=True):
         with patch("os.remove", side_effect=PermissionError("Permission denied")):
             delete_file("test.txt")
-            assert (
-                "Failed to remove file 'test.txt': Permission denied"
-                in caplog.text
-            )
+            assert "Failed to remove file 'test.txt': Permission denied" in caplog.text
 
 
 # Tests for get_unique_entries_df_column
