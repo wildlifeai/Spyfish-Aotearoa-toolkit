@@ -56,7 +56,7 @@ S3_SHAREPOINT_RESERVES_CSV = os.path.join(S3_SHAREPOINT_PATH, "Marine Reserves.c
 S3_SHAREPOINT_TEST_CSV = os.path.join(S3_SHAREPOINT_PATH, "Test.csv")
 
 # S3 KSO Files
-S3_KSO_PATH = "spyfish_metadata/kso_csvs/"
+S3_KSO_PATH = os.path.join("spyfish_metadata", "kso_csvs")
 S3_KSO_ANNOTATIONS_CSV = os.path.join(S3_KSO_PATH, "annotations_buv_doc.csv")
 S3_KSO_MOVIE_CSV = os.path.join(S3_KSO_PATH, "movies_buv_doc.csv")
 S3_KSO_SITE_CSV = os.path.join(S3_KSO_PATH, "sites_buv_doc.csv")

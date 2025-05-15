@@ -62,9 +62,8 @@ def get_s3_file_config(keyword: str) -> S3FileConfig:
 
     return S3FileConfig(
         keyword=keyword,
-        # Get env var checks if the env vars exist
-        kso_env_var=get_env_var(kso_env_var),
-        sharepoint_env_var=get_env_var(sharepoint_env_var),
+        kso_env_var=kso_env_var,
+        sharepoint_env_var=sharepoint_env_var,
         kso_filename=f"{keyword}_kso_temp.csv",
         sharepoint_filename=f"{keyword}_sharepoint_temp.csv",
     )
@@ -99,7 +98,6 @@ def process_s3_files(
                     kso_df = s3_handler.download_and_read_s3_file(
                         bucket,
                         get_env_var(config.kso_env_var),
-                        # TODO check why the env variables are loaded this way?
                         config.kso_filename,
                     )
 
