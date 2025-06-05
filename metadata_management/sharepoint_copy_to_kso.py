@@ -170,7 +170,6 @@ def validate_and_filter_dfs(
                     " will be dropped."
                 )
 
-                logging.info(missing_movie)
                 # Filter out rows with missing values
                 movie_sharepoint_df = movie_sharepoint_df.dropna(
                     subset=movie_required_columns
@@ -190,7 +189,6 @@ def validate_and_filter_dfs(
                     f"missing values in the {site_required_columns} "
                     "required columns of the site SharePoint list copy."
                 )
-                # logging.info(missing_site)
                 # Filter out rows with missing values
                 site_sharepoint_df = site_sharepoint_df.dropna(
                     subset=site_required_columns
