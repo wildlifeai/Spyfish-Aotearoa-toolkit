@@ -2,7 +2,7 @@ import io
 import logging
 import os
 import threading
-from typing import Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import boto3
 import pandas as pd
@@ -12,11 +12,12 @@ from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
 from sftk.utils import delete_file
 
 
+# TODO check when is this used
 class S3FileNotFoundError(Exception):
     """Custom exception for S3 file not found scenarios."""
 
 
-class S3Handler(object):
+class S3Handler:
     """
     Singleton class for interacting with an S3 bucket.
     """
@@ -34,7 +35,7 @@ class S3Handler(object):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
-                cls._instance.s3 = boto3.client(
+                cls._instance.s3 = kwargs.get("s3_client") or boto3.client(
                     "s3",
                     aws_access_key_id=AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
@@ -63,15 +64,18 @@ class S3Handler(object):
         Downloads an object from S3 with progress bar and error handling.
 
         Args:
-            # client (boto3.client): The S3 client.
             key (str): The S3 object key.
             filename (str): The local filename to save the object to.
             version_id (str, optional): The version ID of the object.
                 Defaults to None.
             bucket (str): The S3 bucket name, defaults to env defined bucket.
+
+        Raises:
+            ClientError: If the S3 object cannot be accessed or downloaded.
+            Exception: For other errors during download.
         """
         try:
-            kwargs = {"Bucket": bucket, "Key": key}
+            kwargs: Dict[str, Any] = {"Bucket": bucket, "Key": key}
             if version_id:
                 kwargs["VersionId"] = version_id
 
@@ -96,30 +100,27 @@ class S3Handler(object):
 
     def download_and_read_s3_file(
         self, key: str, filename: str, bucket: str = S3_BUCKET
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame:
         """
         Downloads an S3 object and reads it into a Pandas DataFrame.
 
         Args:
-            s3_client: The S3 client.
-            key: The S3 object key.
-            filename: The local filename to save the downloaded object.
+            key (str): The S3 object key.
+            filename (str): The local filename to save the downloaded object.
             bucket (str): The S3 bucket name, defaults to env defined bucket.
 
         Returns:
-            The DataFrame read from the downloaded file, or None if an error occurs.
+            pd.DataFrame: The DataFrame read from the downloaded file.
 
         Raises:
-            S3FileNotFoundError: If the S3 object is not found.
-            Other exceptions: If other errors occur during download or reading.
+            Exceptions: If other errors occur during download or reading.
         """
-
         try:
             self.download_object_from_s3(key=key, filename=filename, bucket=bucket)
             return pd.read_csv(filename)
         except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
-            raise S3FileNotFoundError(f"Failed to process file {key}: {str(e)}")
+            raise S3FileNotFoundError(f"Failed to download or read S3 file {key}: {e}") from e
 
     def upload_updated_df_to_s3(
         self, df: pd.DataFrame, key: str, keyword: str, bucket: str = S3_BUCKET
@@ -128,9 +129,9 @@ class S3Handler(object):
         Upload an updated DataFrame to S3 with progress bar and error handling.
 
         Args:
-            df: DataFrame to upload.
-            key: S3 key for the file.
-            keyword: String identifier for the type of data (e.g., "survey", "site").
+            df (pd.DataFrame): DataFrame to upload.
+            key (str): S3 key for the file.
+            keyword (str): String identifier for the type of data (e.g., "survey", "site").
             bucket (str): The S3 bucket name, defaults to env defined bucket.
         """
         temp_filename = f"updated_{keyword}_kso_temp.csv"
