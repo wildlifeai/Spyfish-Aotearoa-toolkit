@@ -96,7 +96,7 @@ class S3Handler:
                 )
         except Exception as e:
             logging.error("Failed to download %s from S3: %s", key, e)
-            raise
+            raise e
 
     def download_and_read_s3_file(
         self, key: str, filename: str, bucket: str = S3_BUCKET
@@ -120,7 +120,9 @@ class S3Handler:
             return pd.read_csv(filename)
         except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
-            raise S3FileNotFoundError(f"Failed to download or read S3 file {key}: {e}") from e
+            raise S3FileNotFoundError(
+                f"Failed to download or read S3 file {key}: {e}"
+            ) from e
 
     def upload_updated_df_to_s3(
         self, df: pd.DataFrame, key: str, keyword: str, bucket: str = S3_BUCKET
