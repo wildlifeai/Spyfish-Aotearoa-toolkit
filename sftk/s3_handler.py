@@ -96,7 +96,7 @@ class S3Handler:
                 )
         except Exception as e:
             logging.error("Failed to download %s from S3: %s", key, e)
-            raise
+            raise e
 
     def download_and_read_s3_file(
         self, key: str, filename: str, bucket: str = S3_BUCKET

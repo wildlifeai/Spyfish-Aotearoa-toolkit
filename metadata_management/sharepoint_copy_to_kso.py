@@ -15,9 +15,11 @@ from typing import Optional
 
 import pandas as pd
 
+# These get used by populating the keyword (survey, site, movie, species or test)
+import sftk.common
 from sftk.common import DEV_MODE, S3_BUCKET
 from sftk.s3_handler import S3FileNotFoundError, S3Handler
-from sftk.utils import EnvironmentVariableError, get_env_var, temp_file_manager
+from sftk.utils import EnvironmentVariableError, temp_file_manager
 
 # Set up logging
 logging.basicConfig(
@@ -96,16 +98,17 @@ def process_s3_files(
                 try:
                     # Download and read KSO file
                     kso_df = s3_handler.download_and_read_s3_file(
-                        bucket,
-                        get_env_var(config.kso_env_var),
-                        config.kso_filename,
+                        # TODO error management if no var, similar to get_env_var
+                        key=getattr(sftk.common, config.kso_env_var),
+                        filename=config.kso_filename,
+                        bucket=bucket,
                     )
 
                     # Download and read Sharepoint file
                     sharepoint_df = s3_handler.download_and_read_s3_file(
-                        bucket,
-                        get_env_var(config.sharepoint_env_var),
-                        config.sharepoint_filename,
+                        key=getattr(sftk.common, config.sharepoint_env_var),
+                        filename=config.kso_filename,
+                        bucket=bucket,
                     )
 
                 except S3FileNotFoundError as e:
@@ -551,10 +554,10 @@ def compare_and_update_dataframes(
         try:
             config = get_s3_file_config(keyword)
             s3_handler.upload_updated_df_to_s3(
-                updated_kso_df,
-                bucket,
-                get_env_var(config.kso_env_var),
-                keyword,
+                df=updated_kso_df,
+                key=getattr(sftk.common, config.kso_env_var),
+                keyword=keyword,
+                bucket=bucket,
             )
             logging.info(f"Updated {keyword} DataFrame uploaded to S3")
         except Exception as e:
