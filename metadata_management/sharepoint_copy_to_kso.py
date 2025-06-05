@@ -15,7 +15,8 @@ from typing import Optional
 
 import pandas as pd
 
-# These get used by populating the keyword (survey, site, movie, species or test)
+# These get used to retrieve the paths sharepoint and kso csv files from S3
+# for the various keywords (survey, site, movie, species or test) using getattr
 import sftk.common
 from sftk.common import DEV_MODE, S3_BUCKET
 from sftk.s3_handler import S3FileNotFoundError, S3Handler
@@ -93,12 +94,11 @@ def process_s3_files(
 
         try:
             config = get_s3_file_config(keyword)
-
+            # TODO error management if no var, similar to get_env_var to raise EnvironmentVariableError
             with temp_file_manager([config.kso_filename, config.sharepoint_filename]):
                 try:
                     # Download and read KSO file
                     kso_df = s3_handler.download_and_read_s3_file(
-                        # TODO error management if no var, similar to get_env_var
                         key=getattr(sftk.common, config.kso_env_var),
                         filename=config.kso_filename,
                         bucket=bucket,
@@ -107,7 +107,7 @@ def process_s3_files(
                     # Download and read Sharepoint file
                     sharepoint_df = s3_handler.download_and_read_s3_file(
                         key=getattr(sftk.common, config.sharepoint_env_var),
-                        filename=config.kso_filename,
+                        filename=config.sharepoint_filename,
                         bucket=bucket,
                     )
 
