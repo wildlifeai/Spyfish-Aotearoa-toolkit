@@ -6,7 +6,7 @@ import requests
 env_path = r"C:\Users\USER\anaconda3\envs\powerbi_env\.env"
 
 # Define the URL of the script
-script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/aws_videos/powerbi_setup/get_kso_data_from_s3.py"
+script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/main/powerbi_setup/get_kso_data_from_s3.py"
 
 # Download the script content
 response = requests.get(script_url)
