@@ -5,6 +5,7 @@ import boto3
 from dotenv import load_dotenv
 import pandas as pd
 
+
 # S3 configuration
 def load_aws_credentials(env_path):
     """
