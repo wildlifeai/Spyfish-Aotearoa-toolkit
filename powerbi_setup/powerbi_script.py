@@ -1,29 +1,31 @@
 import importlib.util
-import tempfile
-
+import sys
 import requests
 
-# Specify the path to your .env file - change this to the correct path
+# Specify the path to your .env file
 env_path = r"C:\Users\USER\anaconda3\envs\powerbi_env\.env"
 
 # Define the URL of the script
-script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/refs/heads/main/powerbi_setup/get_kso_data_from_s3.py"
+script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/main/powerbi_setup/get_kso_data_from_s3.py"
 
-# Download the script
+# Download the script content
 response = requests.get(script_url)
-response.raise_for_status()  # Raises error if download fails
+response.raise_for_status()  # This will stop the script if the download fails
+script_content = response.text
 
-# Save to a temp .py file
-with tempfile.NamedTemporaryFile(suffix=".py") as tmp_file:
-    tmp_file.write(response.content)
-    tmp_file.flush()  # Make sure it's written before loading
+# --- The rest of your script remains the same ---
 
-    # Import the module from the temp file
-    spec = importlib.util.spec_from_file_location("kso_to_pbi", tmp_file.name)
-    kso_to_pbi_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(kso_to_pbi_module)
+# Create a module in memory
+spec = importlib.util.spec_from_loader(
+    "kso_to_pbi_module", loader=None, origin=script_url
+)
+kso_to_pbi_module = importlib.util.module_from_spec(spec)
 
-# Run the main function from the imported module
+# Execute the script content within the new module's namespace
+exec(script_content, kso_to_pbi_module.__dict__)
+sys.modules["kso_to_pbi_module"] = kso_to_pbi_module
+
+# Run the main function from the dynamically loaded module
 processed_annotations_df, movies_df, sites_df, surveys_df, species_df = (
     kso_to_pbi_module.main(env_path)
 )
