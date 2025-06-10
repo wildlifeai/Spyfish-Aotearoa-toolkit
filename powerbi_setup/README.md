@@ -45,8 +45,9 @@ Change the whole string after the equal sign, including the brackets.
 
 Save the file as `.env` in the same location as the anaconda environment (e.g. `C:\Users\<YourUsername>\Anaconda3\envs\powerbi_env\.env`).
 
-#### Open the latest PowerBI dashboard
-Download the most up-to-date "DOC Spyfish report vXXX.pbix" and run it in your computer.
+#### Get the latest PowerBI dashboard
+Download the most up-to-date "DOC Spyfish report vXX.pbit" from this repository and run it in your computer.
+
 
 #### Link PowerBI to the Python's version of the Anaconda environment
 Configure PowerBI to use the right Python environment. In Power BI Desktop:
@@ -79,6 +80,18 @@ Check the format is correct by previewing the data and "Load" them into PowerBI.
 
 <img src="img/navigator_display_datasets_preview.png?raw=true" width="500" alt="loaded_datasets"/>
 
+
+## Troubleshoot
+### ADO.NET: error
+If the data from AWS doesn't load and you get this error "
+ADO.NET: Python script error. File "<string>", line 1 404: Not Found ^ SyntaxError: illegal target for annotation
+"
+Remove the data sources from Powerbi (e.g. the sites_df, species_df..) and run the script again.
+
+
+## Tracking the latest version
+To ensure the pbit file in this repository is the most up to date version. Save the powerbi file as a pbit and rename it to track the version number.
+Upload it to this github repo, create a branch and add a commit message summarising the changes.
 
 
 ## Citation

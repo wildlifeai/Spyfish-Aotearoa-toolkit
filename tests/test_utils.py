@@ -1,6 +1,6 @@
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -128,25 +128,43 @@ def test_delete_file_exception(caplog):
 
 # Tests for get_unique_entries_df_column
 def test_get_unique_entries_df_column():
-    # Create mock S3 handler
-    mock_s3_handler = MagicMock()
+    # Create df for filtering
     mock_df = pd.DataFrame(
-        {"col1": ["value1", "value2", "value1", None], "col2": [1, 2, 3, 4]}
+        {
+            "col1": ["value1", "value2", "value1", None],
+            "col2": [1, 2, 3, 4],
+            "IsBadDeployment": [True, False, False, False],
+        }
     )
-    mock_s3_handler.read_df_from_s3_csv.return_value = mock_df
 
     # Test with drop_na=True (default)
-    result = get_unique_entries_df_column(
-        "test.csv", "col1", mock_s3_handler, "test-bucket"
-    )
+    result = get_unique_entries_df_column(mock_df, "col1")
     assert result == {"value1", "value2"}
 
     # Test with drop_na=False
-    result = get_unique_entries_df_column(
-        "test.csv", "col1", mock_s3_handler, "test-bucket", drop_na=False
-    )
+    result = get_unique_entries_df_column(mock_df, "col1", drop_na=False)
     assert None in result
     assert len(result) == 3
+
+    # Test Filtering by column value multiple drops per value
+    result = get_unique_entries_df_column(
+        mock_df, "col1", column_filter="IsBadDeployment", column_value=False
+    )
+    assert result == {"value1", "value2"}
+
+    mock_df = pd.DataFrame(
+        {
+            "col1": ["value1", "value2", "value1", None],
+            "col2": [1, 2, 3, 4],
+            "IsBadDeployment": [False, True, False, False],
+        }
+    )
+
+    # Test Filtering by column value, row cancelled
+    result = get_unique_entries_df_column(
+        mock_df, "col1", column_filter="IsBadDeployment", column_value=False
+    )
+    assert result == {"value1"}
 
 
 # Tests for temp_file_manager
