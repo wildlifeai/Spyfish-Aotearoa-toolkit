@@ -35,19 +35,18 @@ def get_mismatched_video_files_info(
     csv_s3_path = os.path.join(S3_SHAREPOINT_PATH, csv_filename)
     logging.info(f"Processing CSV: {csv_s3_path}.")
 
+    # Load dataframe from AWS
+    csv_df = s3_handler.read_df_from_s3_csv(csv_s3_path, S3_BUCKET)
+
     # Load unique file paths from the CSV column excluding the filtered values
     csv_filepaths_without_filtered_values = get_unique_entries_df_column(
-        csv_s3_path,
+        csv_df,
         csv_column,
-        s3_handler,
-        S3_BUCKET,
         column_filter=column_filter,
         column_value=column_value,
     )
     # Load all unique file paths from the CSV column
-    csv_filepaths_all = get_unique_entries_df_column(
-        csv_s3_path, csv_column, s3_handler, S3_BUCKET
-    )
+    csv_filepaths_all = get_unique_entries_df_column(csv_df, csv_column)
 
     logging.info(f"Unique file paths from CSV: {len(csv_filepaths_all)}.")
     logging.info(

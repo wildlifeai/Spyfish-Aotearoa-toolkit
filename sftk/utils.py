@@ -124,15 +124,27 @@ def filter_file_paths_by_extension(
 
 
 def get_unique_entries_df_column(
-    csv_filename_path,
-    column_name_to_extract,
-    s3_handler,
-    bucket,
-    drop_na=True,
+    buv_deployment_df: pd.DataFrame,
+    column_name_to_extract: str,
+    drop_na: bool = True,
     column_filter: Optional[str] = None,
     column_value: Optional[Any] = None,
 ) -> set:
-    buv_deployment_df = s3_handler.read_df_from_s3_csv(csv_filename_path, bucket)
+    """
+    Return a set of unique values from a specified DataFrame column,
+    with optional filtering and NaN removal.
+
+    Parameters:
+        buv_deployment_df (pd.DataFrame): The DataFrame to process.
+        column_name_to_extract (str): The column from which to extract unique values.
+        drop_na (bool): Whether to drop NaN values (default is True).
+        column_filter (Optional, str): Optional column to filter the DataFrame by.
+        column_value (Optional:Any): Value that the filter column must equal.
+            Only keeps the rows that are equal to this value.
+
+    Returns:
+        A set of unique values from the specified column.
+    """
     if column_filter:
         buv_deployment_df = buv_deployment_df[
             buv_deployment_df[column_filter] == column_value
