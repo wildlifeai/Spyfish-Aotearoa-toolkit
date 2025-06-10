@@ -43,7 +43,9 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 DATA_FOLDER_PATH = os.getenv("DATA_FOLDER_PATH")
 
 S3_SHAREPOINT_PATH = os.path.join("spyfish_metadata", "sharepoint_lists")
-# TODO: keep either DEPLOYMENT_CSV vs MOVIES_CSV
+# Both 'Deployment' and 'Movies' exist because 'Deployment' is the term used in SharePoint,
+#  while 'Movies' is the equivalent term used in KSO (for example, accessed via keyword in
+# the Sharepoint to kso copy workflow)
 S3_SHAREPOINT_DEPLOYMENT_CSV = os.path.join(S3_SHAREPOINT_PATH, "BUV Deployment.csv")
 S3_SHAREPOINT_MOVIE_CSV = os.path.join(S3_SHAREPOINT_PATH, "BUV Deployment.csv")
 S3_SHAREPOINT_DEFINITIONS_CSV = os.path.join(

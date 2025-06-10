@@ -2,7 +2,7 @@ import logging
 import os
 import re
 from contextlib import contextmanager
-from typing import Iterable, List, cast
+from typing import Any, Iterable, List, Optional, cast
 
 import pandas as pd
 
@@ -124,9 +124,19 @@ def filter_file_paths_by_extension(
 
 
 def get_unique_entries_df_column(
-    csv_filename_path, column_name_to_extract, s3_handler, bucket, drop_na=True
+    csv_filename_path,
+    column_name_to_extract,
+    s3_handler,
+    bucket,
+    drop_na=True,
+    column_filter: Optional[str] = None,
+    column_value: Optional[Any] = None,
 ) -> set:
     buv_deployment_df = s3_handler.read_df_from_s3_csv(csv_filename_path, bucket)
+    if column_filter:
+        buv_deployment_df = buv_deployment_df[
+            buv_deployment_df[column_filter] == column_value
+        ]
     if drop_na:
         csv_filepaths = set(
             buv_deployment_df[column_name_to_extract].dropna().astype(str)
