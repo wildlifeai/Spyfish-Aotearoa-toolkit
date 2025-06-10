@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Iterable
+from typing import Any, Iterable, Optional
 
 from sftk.common import S3_BUCKET, S3_SHAREPOINT_PATH
 from sftk.s3_handler import S3Handler
@@ -12,6 +12,8 @@ def get_mismatched_video_files_info(
     csv_column: str,
     valid_extensions: Iterable[str],
     output_files: bool = True,
+    column_filter: Optional[str] = None,
+    column_value: Optional[Any] = None,
 ):
     """
     Compares video file paths from a CSV on with video files available in S3,
@@ -33,11 +35,23 @@ def get_mismatched_video_files_info(
     csv_s3_path = os.path.join(S3_SHAREPOINT_PATH, csv_filename)
     logging.info(f"Processing CSV: {csv_s3_path}.")
 
-    # Load unique file paths from the CSV column
-    csv_filepaths = get_unique_entries_df_column(
-        csv_s3_path, csv_column, s3_handler, S3_BUCKET
+    # Load dataframe from AWS
+    csv_df = s3_handler.read_df_from_s3_csv(csv_s3_path, S3_BUCKET)
+
+    # Load unique file paths from the CSV column excluding the filtered values
+    csv_filepaths_without_filtered_values = get_unique_entries_df_column(
+        csv_df,
+        csv_column,
+        column_filter=column_filter,
+        column_value=column_value,
     )
-    logging.info(f"Unique file paths from CSV: {len(csv_filepaths)}.")
+    # Load all unique file paths from the CSV column
+    csv_filepaths_all = get_unique_entries_df_column(csv_df, csv_column)
+
+    logging.info(f"Unique file paths from CSV: {len(csv_filepaths_all)}.")
+    logging.info(
+        f"Unique file paths from CSV, without filtered value {column_filter} as {column_value}: {len(csv_filepaths_without_filtered_values)}."
+    )
 
     logging.info(f"Processing the files in the bucket: {S3_BUCKET}.")
     # Get all file paths currently in S3
@@ -50,7 +64,7 @@ def get_mismatched_video_files_info(
     logging.info(f"Video files in S3: {len(s3_video_filepaths)}")
 
     # Find missing files in S3 (referenced in CSV but not found in S3)
-    missing_files_in_aws = csv_filepaths - s3_video_filepaths
+    missing_files_in_aws = csv_filepaths_without_filtered_values - s3_video_filepaths
     logging.info(f"Missing video files in AWS: {len(missing_files_in_aws)}")
 
     if output_files:
@@ -62,7 +76,7 @@ def get_mismatched_video_files_info(
             f.write("\n".join(sorted(missing_files_in_aws)))
 
     # Find extra files in S3 (present in S3 but not referenced in CSV)
-    extra_files_in_aws = s3_video_filepaths - csv_filepaths
+    extra_files_in_aws = s3_video_filepaths - csv_filepaths_all
     logging.info(f"Extra video files in AWS: {len(extra_files_in_aws)}.")
 
     if output_files:
@@ -88,9 +102,13 @@ if __name__ == "__main__":
         "mov",
         "mpg",
     )  # avi and wmv not found in bucket,
-    # TODO I assume that lrv files don't need to be processed
+
     get_mismatched_video_files_info(
-        csv_filename, csv_column_to_extract, valid_extensions
+        csv_filename,
+        csv_column_to_extract,
+        valid_extensions,
+        column_filter="IsBadDeployment",
+        column_value=False,
     )
 
     logging.info("mismatched_video_file_info processing completed.")
