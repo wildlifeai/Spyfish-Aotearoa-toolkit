@@ -3,7 +3,11 @@ import sys
 import requests
 
 # Specify the path to your .env file
-env_path = r"C:\Users\USER\anaconda3\envs\powerbi_env\.env"
+# IMPORTANT: You MUST update the path below to point to your .env file!
+# This file contains your AWS credentials and S3 bucket information.
+# Example: env_path = r"C:\Users\YourUsername\Anaconda3\envs\powerbi_env\.env"
+# Consider alternative ways to manage this path if distributing widely.
+env_path = r"C:\Users\USER\anaconda3\envs\powerbi_env\.env"  # FIXME: Update this path for your environment!
 
 # Define the URL of the script
 script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/main/powerbi_setup/get_kso_data_from_s3.py"
