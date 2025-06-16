@@ -9,41 +9,24 @@ Steps:
     - Update KSO-formatted data with latest sharepoint copy data
 """
 
-import os
 import logging
-from typing import Optional, cast
+import sys
 from dataclasses import dataclass
-from contextlib import contextmanager
-import boto3
+from typing import Optional
 
-from tqdm import tqdm
-from dotenv import load_dotenv
 import pandas as pd
+
+# These get used to retrieve the paths sharepoint and kso csv files from S3
+# for the various keywords (survey, site, movie, species or test) using getattr
+import sftk.common
+from sftk.common import DEV_MODE, S3_BUCKET
+from sftk.s3_handler import S3FileNotFoundError, S3Handler
+from sftk.utils import EnvironmentVariableError, temp_file_manager
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-
-# Load environment variables from .env file only in local environment
-if os.environ.get("GITHUB_ACTIONS") != "true":
-    load_dotenv()
-
-# S3 configuration
-S3_BUCKET = os.getenv("S3_BUCKET")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-S3_SHAREPOINT_MOVIE_CSV = os.getenv("S3_SHAREPOINT_MOVIE_CSV")
-S3_SHAREPOINT_SURVEY_CSV = os.getenv("S3_SHAREPOINT_SURVEY_CSV")
-S3_SHAREPOINT_SITE_CSV = os.getenv("S3_SHAREPOINT_SITE_CSV")
-S3_SHAREPOINT_SPECIES_CSV = os.getenv("S3_SHAREPOINT_SPECIES_CSV")
-S3_KSO_MOVIE_CSV = os.getenv("S3_KSO_MOVIE_CSV")
-S3_KSO_SURVEY_CSV = os.getenv("S3_KSO_SURVEY_CSV")
-S3_KSO_SITE_CSV = os.getenv("S3_KSO_SITE_CSV")
-S3_KSO_ANNOTATIONS_CSV = os.getenv("S3_KSO_ANNOTATIONS_CSV")
-S3_KSO_SPECIES_CSV = os.getenv("S3_KSO_SPECIES_CSV")
 
 
 @dataclass
@@ -66,80 +49,6 @@ class S3FileConfig:
     sharepoint_filename: str
 
 
-class S3FileNotFoundError(Exception):
-    """Custom exception for S3 file not found scenarios."""
-
-
-class EnvironmentVariableError(Exception):
-    """Custom exception for missing environment variables."""
-
-
-@contextmanager
-def temp_file_manager(filenames: list[str]):
-    """Context manager to handle temporary file cleanup."""
-    try:
-        yield
-    finally:
-        for filename in filenames:
-            try:
-                if os.path.exists(filename):
-                    os.remove(filename)
-            except Exception as e:
-                logging.error(
-                    "Failed to remove temporary file %s: %s", filename, str(e)
-                )
-
-
-def get_s3_client() -> boto3.client:
-    """
-    Creates and returns an S3 client.
-
-    Returns:
-        boto3.client: The S3 client.
-    """
-    return boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    )
-
-
-def download_object_from_s3(
-    client: boto3.client, bucket: str, key: str, filename: str, version_id: str = None
-) -> None:
-    """
-    Downloads an object from S3 with progress bar and error handling.
-
-    Args:
-        client (boto3.client): The S3 client.
-        bucket (str): The S3 bucket name.
-        key (str): The S3 object key.
-        filename (str): The local filename to save the object to.
-        version_id (str, optional): The version ID of the object. Defaults to None.
-    """
-    try:
-        kwargs = {"Bucket": bucket, "Key": key}
-        if version_id:
-            kwargs["VersionId"] = version_id
-
-        object_size = client.head_object(**kwargs)["ContentLength"]
-
-        def progress_update(bytes_transferred):
-            pbar.update(bytes_transferred)
-
-        with tqdm(total=object_size, unit="B", unit_scale=True, desc=filename) as pbar:
-            client.download_file(
-                Bucket=bucket,
-                Key=key,
-                Filename=filename,
-                Callback=progress_update,
-                Config=boto3.s3.transfer.TransferConfig(use_threads=False),
-            )
-    except Exception as e:
-        logging.error("Failed to download %s from S3: %s", key, e)
-        raise
-
-
 def get_s3_file_config(keyword: str) -> S3FileConfig:
     """
     Creates a configuration object for S3 file operations based on
@@ -149,21 +58,11 @@ def get_s3_file_config(keyword: str) -> S3FileConfig:
         keyword(str): String identifier for the type of data
 
     Returns:
-        S3FileConfig: The configuration information for S3 client.
+        S3FileConfig: The configuration information for S3 handler.
     """
 
     kso_env_var = f"S3_KSO_{keyword.upper()}_CSV"
     sharepoint_env_var = f"S3_SHAREPOINT_{keyword.upper()}_CSV"
-
-    kso_path = os.getenv(kso_env_var)
-    sharepoint_path = os.getenv(sharepoint_env_var)
-
-    if not kso_path:
-        raise EnvironmentVariableError(f"Environment variable '{kso_env_var}' not set.")
-    if not sharepoint_path:
-        raise EnvironmentVariableError(
-            f"Environment variable '{sharepoint_env_var}' not set."
-        )
 
     return S3FileConfig(
         keyword=keyword,
@@ -174,63 +73,14 @@ def get_s3_file_config(keyword: str) -> S3FileConfig:
     )
 
 
-def get_env_var(name: str) -> str:
-    """
-    Gets an environment variable and raises an error if not found.
-
-    Args:
-        name: The name of the environment variable.
-
-    Returns:
-        The value of the environment variable.
-
-    Raises:
-        EnvironmentVariableError: If the environment variable is not set.
-    """
-    value = os.getenv(name)
-    if value is None:
-        raise EnvironmentVariableError(f"Environment variable '{name}' not set.")
-    return cast(str, value)
-
-
-def download_and_read_s3_file(
-    s3_client, bucket: str, key: str, filename: str
-) -> Optional[pd.DataFrame]:
-    """
-    Downloads an S3 object and reads it into a Pandas DataFrame.
-
-    Args:
-        s3_client: The S3 client.
-        bucket: The S3 bucket name.
-        key: The S3 object key.
-        filename: The local filename to save the downloaded object.
-
-    Returns:
-        The DataFrame read from the downloaded file, or None if an error occurs.
-
-    Raises:
-        S3FileNotFoundError: If the S3 object is not found.
-        Other exceptions: If other errors occur during download or reading.
-    """
-
-    try:
-        download_object_from_s3(
-            client=s3_client, bucket=bucket, key=key, filename=filename
-        )
-        return pd.read_csv(filename)
-    except Exception as e:
-        logging.warning("Failed to process S3 file %s: %s", key, str(e))
-        raise S3FileNotFoundError(f"Failed to process file {key}: {str(e)}")
-
-
 def process_s3_files(
-    s3_client, keywords: list[str], bucket: str
+    s3_handler, keywords: list[str], bucket: str
 ) -> dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]]:
     """
     Downloads and reads KSO and SharePoint CSV files from S3 for given keywords.
 
     Args:
-        s3_client: The S3 client.
+        s3_handler: The S3 handler object. TODO if object, no need to pass this around
         keywords: A list of keywords to process.
         bucket: The S3 bucket name.
 
@@ -245,36 +95,38 @@ def process_s3_files(
 
         try:
             config = get_s3_file_config(keyword)
-
+            # TODO error management if no var, similar to get_env_var to raise EnvironmentVariableError
             with temp_file_manager([config.kso_filename, config.sharepoint_filename]):
                 try:
                     # Download and read KSO file
-                    kso_df = download_and_read_s3_file(
-                        s3_client,
-                        bucket,
-                        get_env_var(config.kso_env_var),
-                        config.kso_filename,
+                    kso_df = s3_handler.download_and_read_s3_file(
+                        key=getattr(sftk.common, config.kso_env_var),
+                        filename=config.kso_filename,
+                        bucket=bucket,
                     )
 
                     # Download and read Sharepoint file
-                    sharepoint_df = download_and_read_s3_file(
-                        s3_client,
-                        bucket,
-                        get_env_var(config.sharepoint_env_var),
-                        config.sharepoint_filename,
+                    sharepoint_df = s3_handler.download_and_read_s3_file(
+                        key=getattr(sftk.common, config.sharepoint_env_var),
+                        filename=config.sharepoint_filename,
+                        bucket=bucket,
                     )
 
                 except S3FileNotFoundError as e:
-                    logging.warning(
-                        "CSV file not found in S3 for keyword %s: %s", keyword, str(e)
-                    )
+                    msg = f"CSV file not found in S3 for keyword '{keyword}': {e}"
+                    logging.warning(msg)
+                    raise S3FileNotFoundError(msg) from e
 
+        # TODO fix these errors and exceptions
         except EnvironmentVariableError as e:
-            logging.error(
-                "Environment variable error for keyword %s: %s", keyword, str(e)
-            )
+            msg = f"Missing environment variable for keyword '{keyword}': {e}"
+            logging.error(msg)
+            raise EnvironmentVariableError(msg) from e
+
         except Exception as e:
-            logging.error("Unexpected error processing keyword %s: %s", keyword, str(e))
+            msg = f"Unexpected error while processing keyword '{keyword}': {e}"
+            logging.error(msg)
+            raise RuntimeError(msg) from e
 
         results[keyword] = (kso_df, sharepoint_df)
 
@@ -285,8 +137,7 @@ def validate_and_filter_dfs(
     movie_sharepoint_df: pd.DataFrame, site_sharepoint_df: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Check for missing values in specified columns of movie and site DataFrames,
-    log the missing values, and filter them out.
+    Check for missing values in specified columns of movie and site DataFrames, log the missing values, and filter them out.
 
     Args:
         movie_sharepoint_df: DataFrame containing movie SharePoint data.
@@ -320,14 +171,13 @@ def validate_and_filter_dfs(
                     " will be dropped."
                 )
 
-                logging.info(missing_movie)
                 # Filter out rows with missing values
                 movie_sharepoint_df = movie_sharepoint_df.dropna(
                     subset=movie_required_columns
                 )
 
-        else:
-            logging.info("No missing values found for movie SharePoint list")
+            else:
+                logging.info("No missing values found for movie SharePoint list")
         # Validate site DataFrame
         if site_sharepoint_df is not None:
             missing_site = site_sharepoint_df[
@@ -340,13 +190,12 @@ def validate_and_filter_dfs(
                     f"missing values in the {site_required_columns} "
                     "required columns of the site SharePoint list copy."
                 )
-                logging.info(missing_site)
                 # Filter out rows with missing values
                 site_sharepoint_df = site_sharepoint_df.dropna(
                     subset=site_required_columns
                 )
-        else:
-            logging.info("No missing values found for site SharePoint list")
+            else:
+                logging.info("No missing values found for site SharePoint list")
 
         return movie_sharepoint_df, site_sharepoint_df
 
@@ -356,7 +205,7 @@ def validate_and_filter_dfs(
 
 
 def standarise_sharepoint_to_kso(
-    results: dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]]
+    results: dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]],
 ) -> dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]]:
     """
     Standardise and integrate data from SharePoint copies to align with KSO data structure.
@@ -374,6 +223,7 @@ def standarise_sharepoint_to_kso(
         # Extract relevant DataFrames
         movie_sharepoint_df = results.get("movie", (None, None))[1]
         site_sharepoint_df = results.get("site", (None, None))[1]
+        survey_sharepoint_df = results.get("survey", (None, None))[1]
 
         if movie_sharepoint_df is None or site_sharepoint_df is None:
             logging.warning(
@@ -388,7 +238,7 @@ def standarise_sharepoint_to_kso(
         )
 
         logging.info(
-            "Overwritting site coordinates from site sharepoint copy with actual drop"
+            "Overwriting site coordinates from site sharepoint copy with actual drop"
             " coordinates from deployment sharepoint copy."
         )
 
@@ -401,13 +251,13 @@ def standarise_sharepoint_to_kso(
                 are missing in movie DataFrame."
             )
             return results
-
         if "SiteID" not in site_sharepoint_df.columns:
             logging.warning("Required column 'SiteID' is missing in site DataFrame.")
             return results
-
         # Drop latitude and longitude from site DataFrame to avoid duplicates
-        site_sharepoint_df = site_sharepoint_df.drop(columns=["Latitude", "Longitude"])
+        site_sharepoint_df = site_sharepoint_df.drop(
+            columns=["TargetedLatitude", "TargetedLongitude"]
+        )
 
         # Rename SiteID from movie and site DataFrame to avoid duplicates
         movie_sharepoint_df, site_sharepoint_df = (
@@ -415,6 +265,7 @@ def standarise_sharepoint_to_kso(
             for df in (movie_sharepoint_df, site_sharepoint_df)
         )
 
+        # TODO why is this getting the year/Dire ID out? is this necessary now that we have dropIDs
         # Extract the year from Survey
         movie_sharepoint_df["year"] = movie_sharepoint_df["SurveyID"].str[6:8]
 
@@ -439,9 +290,19 @@ def standarise_sharepoint_to_kso(
             columns=["orig_SiteID", "year", "Longitude", "Latitude"]
         )
 
+        try:
+            survey_sharepoint_df = survey_sharepoint_df.drop(
+                columns=["LinkToMarineReserve"]
+            )
+        except KeyError:
+            logging.warning(
+                "Column 'LinkToMarineReserve' not found in survey_sharepoint_df"
+            )
+
         # Update the results dictionary with the modified site DataFrame
         results["site"] = (results["site"][0], site_sharepoint_df)
         results["movie"] = (results["movie"][0], movie_sharepoint_df)
+        results["survey"] = (results["survey"][0], survey_sharepoint_df)
 
         logging.info("Movie/BUV Drop coordinates have been successfully updated.")
         return results
@@ -450,7 +311,7 @@ def standarise_sharepoint_to_kso(
         logging.error(
             "Error occurred in standarise_sharepoint_to_kso: %s", str(e), exc_info=True
         )
-        raise
+        raise e
 
 
 def validate_dataframes(
@@ -505,7 +366,7 @@ def align_dataframe_columns(kso_df: pd.DataFrame, sharepoint_df: pd.DataFrame) -
         sharepoint_df: Sharepoint DataFrame to modify.
     """
 
-    # Identify column mismatches
+    # Identify and handle column mismatches
     missing_columns = set(kso_df.columns) - set(sharepoint_df.columns)
     extra_columns = set(sharepoint_df.columns) - set(kso_df.columns)
 
@@ -525,46 +386,10 @@ def align_dataframe_columns(kso_df: pd.DataFrame, sharepoint_df: pd.DataFrame) -
             sharepoint_df[col] = None
 
 
-def upload_updated_df_to_s3(
-    s3_client: boto3.client, df: pd.DataFrame, bucket: str, key: str, keyword: str
-) -> None:
-    """
-    Upload an updated DataFrame to S3 with progress bar and error handling.
-
-    Args:
-        s3_client: Boto3 S3 client.
-        df: DataFrame to upload.
-        bucket: S3 bucket name.
-        key: S3 key for the file.
-        keyword: String identifier for the type of data (e.g., "survey", "site").
-    """
-    temp_filename = f"updated_{keyword}_kso_temp.csv"
-    try:
-        df.to_csv(temp_filename, index=True)
-        with tqdm(
-            total=os.path.getsize(temp_filename),
-            unit="B",
-            unit_scale=True,
-            desc=f"Uploading {keyword}",
-        ) as pbar:
-            s3_client.upload_file(
-                Filename=temp_filename,
-                Bucket=bucket,
-                Key=key,
-                Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
-            )
-        logging.info("Successfully uploaded updated %s data to S3", keyword)
-    except Exception as e:
-        logging.error("Failed to upload updated %s data to S3: %s", keyword, str(e))
-    finally:
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
-
-
 def compare_and_update_dataframes(
     kso_df: pd.DataFrame,
     sharepoint_df: pd.DataFrame,
-    s3_client: boto3.client,
+    s3_handler: S3Handler,
     bucket: str,
     keyword: str,
 ) -> pd.DataFrame:
@@ -575,7 +400,7 @@ def compare_and_update_dataframes(
     Args:
         kso_df: DataFrame containing KSO data.
         sharepoint_df: DataFrame containing Sharepoint data.
-        s3_client: Boto3 S3 client.
+        s3_handler: S3Handler instance.
         bucket: S3 bucket name.
         keyword: String identifier for the type of data (e.g., "survey", "site").
 
@@ -587,13 +412,16 @@ def compare_and_update_dataframes(
         "site": "SiteID",
         "movie": "DropID",
         "species": "species_id",
+        "test": "SurveyID",
     }
 
     column_mappings = {
         "survey": {},
         "site": {},
         "movie": {"ID": "id"},
+        # TODO use aphiaID rather than DOC_TaxonID as unique identifier?
         "species": {"DOC_TaxonID": "species_id"},
+        "test": {},
     }
 
     # Validate input
@@ -617,26 +445,13 @@ def compare_and_update_dataframes(
     # Validate DataFrames
     validation_issues = validate_dataframes(kso_df, sharepoint_df, unique_id_column)
     if validation_issues:
+        kso_df = kso_df[~kso_df[unique_id_column].duplicated(keep=False)]
+        sharepoint_df = sharepoint_df[
+            ~sharepoint_df[unique_id_column].duplicated(keep=False)
+        ]
         logging.error("Validation issues found:")
         for issue in validation_issues:
             logging.error("- %s", issue)
-
-    # Identify and handle column mismatches
-    missing_columns = set(kso_df.columns) - set(sharepoint_df.columns)
-    extra_columns = set(sharepoint_df.columns) - set(kso_df.columns)
-
-    if extra_columns:
-        logging.info(
-            f"Dropping extra columns from SharePoint DataFrame: {extra_columns}"
-        )
-        sharepoint_df.drop(columns=list(extra_columns), inplace=True)
-
-    if missing_columns:
-        logging.info(
-            f"Adding missing columns to SharePoint DataFrame: {missing_columns}"
-        )
-        for col in missing_columns:
-            sharepoint_df[col] = None
 
     # Align columns
     align_dataframe_columns(kso_df, sharepoint_df)
@@ -714,13 +529,14 @@ def compare_and_update_dataframes(
                         # Update the value in the original DataFrame
                         updated_kso_df.loc[idx, col] = sharepoint_val
 
-                        # Detailed logging
-                        logging.info(
-                            f"Difference in {keyword} DataFrame: "
-                            f"Row {idx}, Column {col}: "
-                            f"Changed from '{kso_val}' "
-                            f"to '{sharepoint_val}'"
-                        )
+                        if DEV_MODE == "DEBUG":
+                            # Detailed logging
+                            logging.info(
+                                f"Difference in {keyword} DataFrame: "
+                                f"Row {idx}, Column {col}: "
+                                f"Changed from '{kso_val}' "
+                                f"to '{sharepoint_val}'"
+                            )
 
             # Log summary of differences
             logging.info(f"Total differences found: {len(detailed_differences)}")
@@ -738,12 +554,11 @@ def compare_and_update_dataframes(
         # Upload to S3
         try:
             config = get_s3_file_config(keyword)
-            upload_updated_df_to_s3(
-                s3_client,
-                updated_kso_df,
-                bucket,
-                get_env_var(config.kso_env_var),
-                keyword,
+            s3_handler.upload_updated_df_to_s3(
+                df=updated_kso_df,
+                key=getattr(sftk.common, config.kso_env_var),
+                keyword=keyword,
+                bucket=bucket,
             )
             logging.info(f"Updated {keyword} DataFrame uploaded to S3")
         except Exception as e:
@@ -756,22 +571,25 @@ def main():
     """Main function to process each sharepoint list and update KSO data if needed."""
     logging.info("Starting main function")
     keywords = ["survey", "site", "movie", "species"]
+    if DEV_MODE == "TEST":
+        keywords = ["test"]
+
     logging.info(f"Processing csv files in S3 with the following keywords: {keywords}")
 
     try:
-        logging.info("Initializing S3 client...")
-        s3_client = get_s3_client()
-        logging.info("S3 client initialized successfully")
+        logging.info("Initializing S3 handler...")
+        s3_handler = S3Handler()
+        logging.info("S3 handler initialized successfully")
 
         logging.info("Download and check S3 files...")
-        results = process_s3_files(s3_client, keywords, S3_BUCKET)
-        logging.info("S3 files were succesfully downloaded and checked.")
+        results = process_s3_files(s3_handler, keywords, S3_BUCKET)
+        logging.info("S3 files were successfully downloaded and checked.")
 
         logging.info(
-            "Formatting movie and site info from sharepoint copy to match KSO requirements..."
+            "Formatting survey, movie and site info from sharepoint copy to match KSO requirements..."
         )
         results = standarise_sharepoint_to_kso(results)
-        logging.info("movie and site info has been succesfully formatted")
+        logging.info("survey, movie and site info has been successfully formatted")
 
         for keyword, (kso_df, sharepoint_df) in results.items():
             logging.info(f"Processing {keyword} data...")
@@ -785,7 +603,7 @@ def main():
                 compare_and_update_dataframes(
                     kso_df=kso_df,
                     sharepoint_df=sharepoint_df,
-                    s3_client=s3_client,
+                    s3_handler=s3_handler,
                     bucket=S3_BUCKET,
                     keyword=keyword,
                 )
@@ -802,6 +620,7 @@ def main():
             str(e),
             exc_info=True,
         )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

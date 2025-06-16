@@ -1,0 +1,3 @@
+DropID,SurveyID,SiteID,Latitude,Longitude,EventDate,Created By,TideLevel,Weather,UnderwaterVisibility,ReplicateWithinSite,EventTimeStart,EventTimeEnd,DepthDeployment,DepthStrata,NZMHCS_Abiotic,NZMHCS_Biotic,NotesDeployment,RecordedBy,IsBadDeployment,fps,duration,fileName,LinkToVideoFile,SamplingStart,SamplingEnd,ID
+ABC_20250101_BUV_ABC_004_01,ABC_20250101_BUV,ABC_004,-41.2898056,174.7749949,1/01/2025,A. Maomao,Low,<0.1m_Swell,,1,10:55,,14,,,,,Mr Maomao,FALSE,,,,,,,99998
+XYZ_20241201_BUV_XYZ_017_01,XYZ_20241201_BUV,XYZ_017,-41.2888056,174.8749949,1/12/2024,M. Stargazer,,,,1,,,,,,,,Ms Stargazer,FALSE,30,2062,XYZ_20241201_BUV_XYZ_017_01.mp4,XYZ_20241201_BUV/XYZ_017/XYZ_20241201_BUV_XYZ_017_01.mp4,0,1800,99999

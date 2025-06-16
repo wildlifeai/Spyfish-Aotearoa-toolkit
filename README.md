@@ -24,7 +24,18 @@ The Spyfish Aotearoa Toolkit (sftk) is a Python package that provides a set of t
 
 ### Usage
 
-The package is not yet installable, but you can use it by adding the root directory to your `PYTHONPATH` and importing the modules you need.
+You can install the package by running this
+
+```
+pip install "/path/to/Spyfish-Aotearoa-toolkit"
+```
+or with the dev tag, which adds a few additional development related libraries (the -e stands for editable, meaning that if you change something in the code it will be reflected in the functioning in the package).
+```
+pip install -e "/path/to/Spyfish-Aotearoa-toolkit[dev]"
+```
+
+
+You can also use the sftk package by adding the root directory to your `PYTHONPATH` and importing the modules you need.
 
 ```python
 import sys
@@ -45,32 +56,80 @@ echo 'export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit' >> ~/.bash
 ```
 
 
+
+### Environment Variables
+Copy `.env_sample` to `.env` and fill in your own values:
+
+
+
+## Collaborations
+
+We are working to make our work available to anyone interested.
+Take a look into existing [issues][issues-url] (or code), and contribute any way you can.
+
+
+
+Feel free to [contact us][contact_info], if you have any questions.
+
+
+
+### Pre-Commit checks
+
+We set up some pre-commit checks, so run this before you contribute:
+```bash
+pip install pre-commit # only the first time
+pre-commit install
+```
+
+This will fix/change/flag any issues defined in our pre-commit config.
+You need to re add any changes performed by the pre-commit.
+
+
+Make sure your code is up to standard, but if the existing code is showing too many errors, feel free to skip it by adding `--no-verify`:
+```bash
+git commit --no-verify -m "message"
+```
+
+You can run single commands, for example:
+```bash
+pre-commit run flake8
+```
+
+
+### Spelling checker
+Please install a spelling checker in your IDE of choice, for example [this one][spell-checker] VS code/Cursor.
+
+
+
 ## Metadata management
+
+
+## Questions
+
+Please feel free to [contact us][contact_info] or raise an issue, if you have any questions.
+
 
 
 ## Citation
 
 If you use this code, please cite:
 
-Anton V., Fonda K., Beran H., Marinovich J., Ladds M. (2024). Spyfish Aotearoa Toolkit. https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit
+Anton V., Fonda K., Atkin E., Beran H., Marinovich J., Ladds M. (2024). Spyfish Aotearoa Toolkit. https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit
 
-
-## Collaborations/questions
-
-We are working to make our work available to anyone interested. Please feel free to [contact us][contact_info] if you have any questions.
 
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-shield]: https://img.shields.io/github/contributors/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
-[contributors-url]: https://https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/graphs/contributors
+[contributors-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [forks-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/network/members
 [stars-shield]: https://img.shields.io/github/stars/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
-[stars-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/stargazers
+[stars-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/stargazers]
 [issues-shield]: https://img.shields.io/github/issues/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [issues-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/issues
 [license-shield]: https://img.shields.io/github/license/wildlifeai/Spyfish-Aotearoa-toolkit.svg?style=for-the-badge
 [license-url]: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/blob/main/LICENSE.txt
+[spell-checker]: https://marketplace.cursorapi.com/items?itemName=streetsidesoftware.code-spell-checker]
 [contact_info]: contact@wildlife.ai
