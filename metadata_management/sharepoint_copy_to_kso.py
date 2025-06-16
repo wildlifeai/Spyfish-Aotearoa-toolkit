@@ -10,6 +10,7 @@ Steps:
 """
 
 import logging
+import sys
 from dataclasses import dataclass
 from typing import Optional
 
@@ -619,6 +620,7 @@ def main():
             str(e),
             exc_info=True,
         )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
