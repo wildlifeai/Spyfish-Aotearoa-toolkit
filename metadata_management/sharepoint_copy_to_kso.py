@@ -254,7 +254,9 @@ def standarise_sharepoint_to_kso(
             logging.warning("Required column 'SiteID' is missing in site DataFrame.")
             return results
         # Drop latitude and longitude from site DataFrame to avoid duplicates
-        site_sharepoint_df = site_sharepoint_df.drop(columns=["Latitude", "Longitude"])
+        site_sharepoint_df = site_sharepoint_df.drop(
+            columns=["TargetedLatitude", "TargetedLongitude"]
+        )
 
         # Rename SiteID from movie and site DataFrame to avoid duplicates
         movie_sharepoint_df, site_sharepoint_df = (
