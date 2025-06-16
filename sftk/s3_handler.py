@@ -44,6 +44,21 @@ class S3Handler:
 
             return cls._instance
 
+    def test_connection(self) -> bool:
+        """
+        Test the connection to the S3 bucket.
+
+        Returns:
+            bool: True if the connection is successful, False otherwise.
+        """
+        try:
+            self.s3.get_caller_identity()
+            logging.info("S3 connection test successful.")
+            return True
+        except Exception as e:
+            logging.error(f"S3 connection test failed: {e}")
+            return False
+
     def __repr__(self) -> str:
         """
         Return a string representation of the class.

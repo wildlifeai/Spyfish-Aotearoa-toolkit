@@ -66,7 +66,6 @@ S3_KSO_SPECIES_CSV = os.path.join(S3_KSO_PATH, "species_buv_doc.csv")
 S3_KSO_SURVEY_CSV = os.path.join(S3_KSO_PATH, "surveys_buv_doc.csv")
 S3_KSO_TEST_CSV = os.path.join(S3_KSO_PATH, "test_buv_doc.csv")
 
-
 # Keywords to monitor in email
 KEYWORDS = [
     "survey",
