@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from sftk.common import VALIDATION_PATTERNS, VALIDATION_RULES
+from sftk.common import (
+    S3_BUCKET,
+    S3_KSO_ERRORS_CSV,
+    VALIDATION_PATTERNS,
+    VALIDATION_RULES,
+)
 from sftk.s3_handler import S3Handler
 
 
@@ -18,17 +23,17 @@ class ErrorChecking:
 
 class SharepointValidator:
     def __init__(self):
-        self.validation_rules = self._get_validation_rules()
-        self.patterns = VALIDATION_PATTERNS
         self.errors = []
         self.errors_df = None
+        self.patterns = VALIDATION_PATTERNS
+        self.s3_handler = S3Handler()
+        self.validation_rules = self._get_validation_rules()
 
     def _get_validation_rules(self):
-        s3_handler = S3Handler()
 
         for dataset_name, rule_set in VALIDATION_RULES.items():
-            VALIDATION_RULES[dataset_name]["dataset"] = s3_handler.read_df_from_s3_csv(
-                rule_set["file_name"]
+            VALIDATION_RULES[dataset_name]["dataset"] = (
+                self.s3_handler.read_df_from_s3_csv(rule_set["file_name"])
             )
         return VALIDATION_RULES
 
@@ -256,9 +261,21 @@ class SharepointValidator:
         self.errors = [ErrorChecking(**row) for _, row in df_no_duplicates.iterrows()]
         self.errors_df = df_no_duplicates
 
-    def _export_to_csv(self, csv_file_name="validation_errors_cleaned.csv"):
+    def export_to_csv(self, csv_file_name="validation_errors_cleaned.csv"):
         self.errors_df["ErrorSource"] = "Sharepoint error validation"
         self.errors_df.to_csv(csv_file_name, index=False)
+        logging.info(f"Errors exported to csv file {csv_file_name}.")
+
+    def upload_to_s3(self):
+        keyword = "errors"
+        self.s3_handler.upload_updated_df_to_s3(
+            df=self.errors_df,
+            key=S3_KSO_ERRORS_CSV,
+            keyword=keyword,
+            bucket=S3_BUCKET,
+            keep_df_index=False,
+        )
+        logging.info(f"Updated {keyword} DataFrame uploaded to S3")
 
 
 if __name__ == "__main__":
@@ -283,5 +300,6 @@ if __name__ == "__main__":
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"
     )
     # Export to csv
-    validator._export_to_csv("validation_errors_test.csv")
-    logging.info("Errors exported to csv file.")
+    # validator.export_to_csv("validation_errors_test.csv")
+    validator.upload_to_s3()
+    logging.info("Error validation process completed, files created/uploaded.")

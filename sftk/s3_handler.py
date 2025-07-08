@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import threading
+from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional
 
 import boto3
@@ -15,6 +16,47 @@ from sftk.utils import delete_file
 # TODO check when is this used
 class S3FileNotFoundError(Exception):
     """Custom exception for S3 file not found scenarios."""
+
+
+@dataclass
+class S3FileConfig:
+    """
+    Configuration class for S3 file operations containing file paths and environment variables.
+
+    Attributes:
+        keyword (str): Identifier for the type of data (e.g., 'survey', 'site', 'movie')
+        kso_env_var (str): Environment variable name for KSO file path
+        sharepoint_env_var (str): Environment variable name for Sharepoint file path
+        kso_filename (str): Temporary filename for KSO data
+        sharepoint_filename (str): Temporary filename for Sharepoint data
+    """
+
+    keyword: str
+    kso_env_var: str
+    sharepoint_env_var: str
+    kso_filename: str
+    sharepoint_filename: str
+
+    @classmethod
+    def from_keyword(cls, keyword: str) -> "S3FileConfig":
+        """
+        Creates a configuration object for S3 file operations based on
+        a keyword (e.g., "survey", "site").
+
+        Args:
+            keyword(str): String identifier for the type of data
+
+        Returns:
+            S3FileConfig: The configuration information for S3 handler.
+        """
+        upper = keyword.upper()
+        return cls(
+            keyword=keyword,
+            kso_env_var=f"S3_KSO_{upper}_CSV",
+            sharepoint_env_var=f"S3_SHAREPOINT_{upper}_CSV",
+            kso_filename=f"{keyword}_kso_temp.csv",
+            sharepoint_filename=f"{keyword}_sharepoint_temp.csv",
+        )
 
 
 class S3Handler:
@@ -35,6 +77,7 @@ class S3Handler:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
+                # TODO create user input option
                 cls._instance.s3 = kwargs.get("s3_client") or boto3.client(
                     "s3",
                     aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -125,7 +168,12 @@ class S3Handler:
             ) from e
 
     def upload_updated_df_to_s3(
-        self, df: pd.DataFrame, key: str, keyword: str, bucket: str = S3_BUCKET
+        self,
+        df: pd.DataFrame,
+        key: str,
+        keyword: str,
+        bucket: str = S3_BUCKET,
+        keep_df_index=True,
     ) -> None:
         """
         Upload an updated DataFrame to S3 with progress bar and error handling.
@@ -138,7 +186,7 @@ class S3Handler:
         """
         temp_filename = f"updated_{keyword}_kso_temp.csv"
         try:
-            df.to_csv(temp_filename, index=True)
+            df.to_csv(temp_filename, index=keep_df_index)
             with tqdm(
                 total=os.path.getsize(temp_filename),
                 unit="B",
