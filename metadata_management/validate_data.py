@@ -367,6 +367,6 @@ if __name__ == "__main__":
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"
     )
     # Export to csv
-    validator.export_to_csv("validation_errors_test_no_dup_16.csv")
-    # validator.upload_to_s3()
+    # validator.export_to_csv("validation_errors.csv")
+    validator.upload_to_s3()
     logging.info("Error validation process completed, files created/uploaded.")
