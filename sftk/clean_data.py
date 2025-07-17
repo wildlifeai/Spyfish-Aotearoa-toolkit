@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+import numpy as np
 import requests
 
 
@@ -122,3 +123,14 @@ class ScientificNameProcessing:
 class MetadataProcessing:
     def __init__(self):
         pass
+
+
+# helper functions
+
+
+# Function to check if a float column contains only whole numbers
+def convert_int_num_columns_to_int(df):
+    for col in df.select_dtypes(include=[np.number]).columns:
+        if np.all(df[col].dropna() == df[col].dropna().astype(int)):
+            df[col] = df[col].astype("Int64")  # Use pandas nullable Int type
+    return df

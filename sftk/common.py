@@ -1,3 +1,4 @@
+import getpass
 import os
 
 from dotenv import load_dotenv
@@ -35,16 +36,34 @@ EMAIL_ARCHIVE_FOLDER_CANDIDATES = [
 ]
 EMAIL_ARCHIVE_FOLDER = "[Gmail]/All Mail"
 
-# S3 configuration
-S3_BUCKET = os.getenv("S3_BUCKET")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-
 DATA_FOLDER_PATH = os.getenv("DATA_FOLDER_PATH")
+
+# Biigle credentials
+BIIGLE_API_EMAIL = os.getenv("BIIGLE_API_EMAIL")
+BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")  # api token get from ui
+
+# S3 configuration.
+# Ask for user input if the env variables are not found.
+# TODO check ways to set variables, if there are issues reading the .env file
+S3_BUCKET = os.getenv("S3_BUCKET")
+if not S3_BUCKET:
+    S3_BUCKET = input("Enter your S3_BUCKET: ")
+    os.environ["S3_BUCKET"] = S3_BUCKET
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+if not AWS_ACCESS_KEY_ID:
+    AWS_ACCESS_KEY_ID = input("Enter your AWS_ACCESS_KEY_ID: ")
+    os.environ["AWS_ACCESS_KEY_ID"] = AWS_ACCESS_KEY_ID
+
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+if not AWS_SECRET_ACCESS_KEY:
+    AWS_SECRET_ACCESS_KEY = getpass.getpass("Enter your AWS_SECRET_ACCESS_KEY: ")
+    os.environ["AWS_SECRET_ACCESS_KEY"] = AWS_SECRET_ACCESS_KEY
+
 
 S3_SHAREPOINT_PATH = os.path.join("spyfish_metadata", "sharepoint_lists")
 # Both 'Deployment' and 'Movies' exist because 'Deployment' is the term used in SharePoint,
-#  while 'Movies' is the equivalent term used in KSO (for example, accessed via keyword in
+# while 'Movies' is the equivalent term used in KSO (for example, accessed via keyword in
 # the Sharepoint to kso copy workflow)
 S3_SHAREPOINT_DEPLOYMENT_CSV = os.path.join(S3_SHAREPOINT_PATH, "BUV Deployment.csv")
 S3_SHAREPOINT_MOVIE_CSV = os.path.join(S3_SHAREPOINT_PATH, "BUV Deployment.csv")
@@ -94,19 +113,20 @@ MOVIE_EXTENSIONS = [
 VALIDATION_RULES = {
     "deployments": {
         "file_name": S3_SHAREPOINT_DEPLOYMENT_CSV,
+        # TODO add fps, sampling start and end etc.
         "required": ["DropID", "SurveyID", "SiteID", "FileName", "LinkToVideoFile"],
         "unique": ["DropID"],
         "info_columns": ["SurveyID", "SiteID"],
         "foreign_keys": {"surveys": "SurveyID", "sites": "SiteID"},
         "relationships": [
             # TODO fix replicate in BUV dep many empty vals
-            # then also here with the 0
+            # TODO fix the predefined 0, for now not a problem as no survey has more than 9 entries
             {
                 "column": "DropID",
                 "rule": "equals",
-                "template": "{SurveyID}_{SiteID}_0{ReplicateWithinSite}.mp4",
+                "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             },
-            # TODO add below when FileNames arre ready
+            # TODO add below when FileNames are ready
             {
                 "column": "FileName",
                 "rule": "equals",
@@ -117,7 +137,7 @@ VALIDATION_RULES = {
             {
                 "column": "LinkToVideoFile",
                 "rule": "equals",
-                "template": "{SurveyID}/{DropID}/{DropID}.mp4",
+                "template": "media/{SurveyID}/{DropID}/{DropID}.mp4",
                 # TODO: Remove null allowed
                 "allowed_values": ["NO VIDEO BAD DEPLOYMENT", "NULL"],
             },

@@ -6,13 +6,14 @@ from typing import Optional
 
 import pandas as pd
 
+from sftk.clean_data import convert_int_num_columns_to_int
 from sftk.common import (
     S3_BUCKET,
     S3_KSO_ERRORS_CSV,
     VALIDATION_PATTERNS,
     VALIDATION_RULES,
 )
-from sftk.s3_handler import S3Handler
+from sftk.s3_handler import S3FileNotFoundError, S3Handler
 
 
 @dataclass
@@ -34,16 +35,17 @@ class SharepointValidator:
     def _get_validation_rules(self):
         validation_rules = copy.deepcopy(VALIDATION_RULES)
         for dataset_name, rule_set in validation_rules.items():
+            # df = self.s3_handler.read_df_from_s3_csv(rule_set["file_name"])
             try:
                 df = self.s3_handler.read_df_from_s3_csv(rule_set["file_name"])
-                validation_rules[dataset_name]["dataset"] = df
-            except Exception as e:
+            except S3FileNotFoundError as e:
                 self._add_error(
                     file_name=dataset_name,
                     message=f"Dataset '{dataset_name}' could not be downloaded from '{rule_set["file_name"]}', error: {e}",
                 )
                 # Assign empty df on failure
-                validation_rules[dataset_name]["dataset"] = pd.DataFrame()
+                df = pd.DataFrame()
+            validation_rules[dataset_name]["dataset"] = df
         return validation_rules
 
     def validate(
@@ -56,20 +58,23 @@ class SharepointValidator:
         column_relationships=False,
     ):
 
-        self.errors = []
-
         if not any([required, unique, foreign_keys, formats, column_relationships]):
             required = unique = foreign_keys = formats = column_relationships = True
 
         for dataset_name, rules in self.validation_rules.items():
-            df = rules.get("dataset", pd.DataFrame())
             file_name = Path(rules.get("file_name", "")).name
+            df = rules.get("dataset", pd.DataFrame())
 
             if df is None:
                 self._add_error(
                     file_name=file_name, message="Dataset could not be loaded."
                 )
                 continue
+
+            # change numerical values into integers if relevant
+
+            df = convert_int_num_columns_to_int(df)
+
             if required:
                 self._check_required(rules, df)
             if unique:
@@ -97,10 +102,8 @@ class SharepointValidator:
     ):
         try:
             relevant_column_info = row[col_name]
-        except Exception as e:
-            print(row)
-            print(f"No {col_name} in row {e}, for check {check}")
-            relevant_column_info = f"No {col_name} in row {e}"
+        except KeyError as e:
+            relevant_column_info = f"No {col_name} in row for check {check}, error: {e}"
 
         if check == "required":
             relevant_column_info = " ".join(
@@ -113,12 +116,7 @@ class SharepointValidator:
         elif check == "duplicate":
             message = f"Duplicate value in unique column '{col_name}'"
         elif check == "missing_fk":
-            message = (
-                (
-                    f"Foreign key '{col_name}' = '{row[col_name]}' "
-                    f"not found in '{fk_file_name}'"
-                ),
-            )
+            message = f"Foreign key '{col_name}' = '{row[col_name]}' not found in '{fk_file_name}'"
         elif check == "invalid_format":
             message = f"Value {row[col_name]} does not match required format for {col_name}: expected pattern '{pattern}'"
         else:
@@ -237,11 +235,11 @@ class SharepointValidator:
                 axis=1,
             )
 
-    def _check_row_relationship(self, row, dataset_name, col, relationships):
+    def _check_row_relationship(self, row, file_name, col_name, relationships):
         rule = relationships["rule"]
         template = relationships["template"]
         allowed_values = relationships.get("allowed_values", [])
-        actual = row[col]
+        actual = row[col_name]
         # skip allowed values
         is_null_allowed = "NULL" in allowed_values
         if (actual in allowed_values) or (is_null_allowed and pd.isna(actual)):
@@ -251,18 +249,19 @@ class SharepointValidator:
             expected = template.format(**row)
         except KeyError as e:
             self._add_error(
-                column_name=col,
+                column_name=col_name,
                 relevant_column_value=None,
-                file_name=dataset_name,
-                message=f"Missing column for relationship template: {str(e)}",
+                file_name=file_name,
+                message=f"Missing column {col_name} for relationship template: {str(e)}",
             )
-        # TODO for not only one rule
+            return None
+
         if rule == "equals" and str(actual) != str(expected):
             self._add_error(
-                column_name=col,
+                column_name=col_name,
                 relevant_column_value=actual,
-                file_name=dataset_name,
-                message=f"{col} should be '{expected}', but is '{actual}'",
+                file_name=file_name,
+                message=f"{col_name} should be '{expected}', but is '{actual}'",
             )
 
     def _check_column_relationships(self, rules, df):
@@ -285,7 +284,7 @@ class SharepointValidator:
                 self._check_row_relationship,
                 file_name=dataset_name,
                 col_name=col,
-                relationships=relationships,
+                relationships=rel,
                 axis=1,
             )
 
@@ -296,30 +295,16 @@ class SharepointValidator:
             ErrorChecking(
                 ColumnName=column_name,
                 RelevantColumnsValue=relevant_column_value,
-                # TODO this shouldn't be None
-                RelevantFile=Path(file_name).name if file_name else None,
+                RelevantFile=Path(file_name).name if file_name else "unknown_file",
                 ErrorInfo=message,
             )
         )
 
     def _get_df(self, remove_duplicates):
         self.errors_df = pd.DataFrame([e.__dict__ for e in self.errors])
-        # reset self.errors
-        self.errors = []
+
         if remove_duplicates:
             self._deduplicate_errors()
-
-    # def _deduplicate_errors(self):
-    #     # TODO fix this
-    #     df = self.errors_df
-
-    #     key_cols = list(ErrorChecking.__dataclass_fields__.keys())
-    #     # Temporarily replace NaN with a string in key columns (for grouping)
-    #     df.fillna("NULL", inplace=True)
-    #     df_no_duplicates = df.groupby(key_cols, as_index=False).first()
-    #     df_no_duplicates.replace("NULL", pd.NA, inplace=True)
-    #     self.errors = [ErrorChecking(**row) for _, row in df_no_duplicates.iterrows()]
-    #     self.errors_df = df_no_duplicates
 
     def _deduplicate_errors(self):
         if self.errors_df.empty:
@@ -327,6 +312,9 @@ class SharepointValidator:
 
         key_cols = list(ErrorChecking.__dataclass_fields__.keys())
         self.errors_df.drop_duplicates(subset=key_cols, ignore_index=True, inplace=True)
+        self.errors = [
+            ErrorChecking(**row) for row in self.errors_df.to_dict(orient="records")
+        ]
 
     def export_to_csv(self, csv_file_name="validation_errors_cleaned.csv"):
         self.errors_df["ErrorSource"] = "Sharepoint error validation"
@@ -346,6 +334,7 @@ class SharepointValidator:
 
 
 if __name__ == "__main__":
+    # TODO figure out logging
     # Ensure logging is configured at the start
     logging.basicConfig(
         level=logging.INFO,
@@ -361,7 +350,7 @@ if __name__ == "__main__":
         unique=True,
         foreign_keys=True,
         formats=True,
-        column_relationships=False,
+        column_relationships=True,
     )
     logging.info(
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"

@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, Optional
 
 import boto3
 import pandas as pd
+from botocore.exceptions import BotoCoreError
 from tqdm import tqdm
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
@@ -16,6 +17,8 @@ from sftk.utils import delete_file
 # TODO check when is this used
 class S3FileNotFoundError(Exception):
     """Custom exception for S3 file not found scenarios."""
+
+    pass
 
 
 @dataclass
@@ -139,7 +142,7 @@ class S3Handler:
                 )
         except Exception as e:
             logging.error("Failed to download %s from S3: %s", key, e)
-            raise e
+            raise S3FileNotFoundError("Failed to download %s from S3: %s", key, e)
 
     def download_and_read_s3_file(
         self, key: str, filename: str, bucket: str = S3_BUCKET
@@ -161,7 +164,7 @@ class S3Handler:
         try:
             self.download_object_from_s3(key=key, filename=filename, bucket=bucket)
             return pd.read_csv(filename)
-        except Exception as e:
+        except BotoCoreError as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
             raise S3FileNotFoundError(
                 f"Failed to download or read S3 file {key}: {e}"
@@ -200,7 +203,7 @@ class S3Handler:
                     Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
                 )
             logging.info("Successfully uploaded updated %s data to S3", keyword)
-        except Exception as e:
+        except BotoCoreError as e:
             logging.error("Failed to upload updated %s data to S3: %s", keyword, str(e))
         finally:
             delete_file(temp_filename)
@@ -256,8 +259,7 @@ class S3Handler:
                         )
                         # Delete
                         self.s3.delete_object(Bucket=bucket, Key=old_name)
-                except Exception as e:
-                    # TODO add tighter exception
+                except BotoCoreError as e:
                     logging.warning(
                         f"Failed to rename {old_name} to {new_name}, error: {str(e)}"
                     )
@@ -284,6 +286,4 @@ class S3Handler:
         # Download the object to memory
         response = self.s3.get_object(Bucket=s3_bucket, Key=csv_s3_path)
 
-        # TODO add this to read file function?
-        buv_deployment_df = pd.read_csv(io.BytesIO(response["Body"].read()))
-        return buv_deployment_df
+        return pd.read_csv(io.BytesIO(response["Body"].read()))
