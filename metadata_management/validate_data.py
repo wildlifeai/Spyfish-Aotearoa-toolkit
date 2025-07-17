@@ -35,7 +35,6 @@ class SharepointValidator:
     def _get_validation_rules(self):
         validation_rules = copy.deepcopy(VALIDATION_RULES)
         for dataset_name, rule_set in validation_rules.items():
-            # df = self.s3_handler.read_df_from_s3_csv(rule_set["file_name"])
             try:
                 df = self.s3_handler.read_df_from_s3_csv(rule_set["file_name"])
             except S3FileNotFoundError as e:
@@ -248,7 +247,7 @@ class SharepointValidator:
         allowed_values = relationships.get("allowed_values", [])
         actual = row[col_name]
         # skip allowed values
-        is_null_allowed = "NULL" in allowed_values
+        is_null_allowed = relationships.get("allow_null")
         if (actual in allowed_values) or (is_null_allowed and pd.isna(actual)):
             return None
 
@@ -286,7 +285,7 @@ class SharepointValidator:
                     message=f"Missing column for relationship check: {col}",
                 )
                 continue
-
+            # TODO check when is it better to use apply vs iterrows
             df.apply(
                 self._check_row_relationship,
                 file_name=dataset_name,
@@ -363,6 +362,7 @@ if __name__ == "__main__":
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"
     )
     # Export to csv
-    validator.export_to_csv("validation_errors.csv")
-    # validator.upload_to_s3()
+    # TODO add DEV_MOD£ variable to decide one or the other:
+    # validator.export_to_csv("validation_errors.csv")
+    validator.upload_to_s3()
     logging.info("Error validation process completed, files created/uploaded.")

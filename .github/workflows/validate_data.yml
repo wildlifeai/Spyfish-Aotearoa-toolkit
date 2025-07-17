@@ -9,7 +9,7 @@ on:
 jobs:
   upload-to-s3:
     runs-on: ubuntu-latest
-    # TODO add if github.ref_name == 'main'
+    if: github.ref_name == 'main'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -33,4 +33,3 @@ jobs:
         S3_BUCKET: ${{ secrets.S3_BUCKET }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        DEV_MODE : ${{ vars.DEV_MODE }}

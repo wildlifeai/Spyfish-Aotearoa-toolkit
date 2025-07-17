@@ -114,20 +114,21 @@ VALIDATION_RULES = {
                 "rule": "equals",
                 "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             },
-            # TODO add below when FileNames are ready
             {
                 "column": "FileName",
                 "rule": "equals",
                 "template": "{DropID}.mp4",
                 # TODO: Remove null allowed
-                "allowed_values": ["NO VIDEO BAD DEPLOYMENT", "NULL"],
+                "allowed_values": ["NO VIDEO BAD DEPLOYMENT"],
+                "allow_null": True,
             },
             {
                 "column": "LinkToVideoFile",
                 "rule": "equals",
                 "template": "media/{SurveyID}/{DropID}/{DropID}.mp4",
                 # TODO: Remove null allowed
-                "allowed_values": ["NO VIDEO BAD DEPLOYMENT", "NULL"],
+                "allowed_values": ["NO VIDEO BAD DEPLOYMENT"],
+                "allow_null": True,
             },
         ],
     },

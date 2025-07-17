@@ -164,7 +164,7 @@ class S3Handler:
         try:
             self.download_object_from_s3(key=key, filename=filename, bucket=bucket)
             return pd.read_csv(filename)
-        except BotoCoreError as e:
+        except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
             raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}") from e
 

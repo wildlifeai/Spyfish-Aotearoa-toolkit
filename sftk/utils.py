@@ -163,7 +163,8 @@ def get_unique_entries_df_column(
 # Function to check if a float column contains only whole numbers
 def convert_int_num_columns_to_int(df):
     for col in df.select_dtypes(include=[np.number]).columns:
-        if np.all(df[col].dropna() == df[col].dropna().astype(int)):
+        series_no_na = df[col].dropna()
+        if not series_no_na.empty and np.all(series_no_na == series_no_na.astype(int)):
             df[col] = df[col].astype("Int64")  # Use pandas nullable Int type
     return df
 
