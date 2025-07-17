@@ -365,7 +365,6 @@ if __name__ == "__main__":
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"
     )
     # Export to csv
-    # TODO add DEV_MODE variable to decide one or the other:
     if EXPORT_LOCAL:
         validator.export_to_csv(
             os.path.join(LOCAL_DATA_FOLDER_PATH, "validation_errors.csv")

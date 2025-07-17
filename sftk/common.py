@@ -45,8 +45,8 @@ BIIGLE_API_EMAIL = os.getenv("BIIGLE_API_EMAIL")
 BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")  # api token get from ui
 
 # S3 configuration.
-# Ask for user input if the env variables are not found.
 # TODO check ways to set variables, if there are issues reading the .env file
+# For example ask for user input if the env variables are not found.
 S3_BUCKET = os.getenv("S3_BUCKET")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
@@ -110,8 +110,6 @@ VALIDATION_RULES = {
         "info_columns": ["SurveyID", "SiteID"],
         "foreign_keys": {"surveys": "SurveyID", "sites": "SiteID"},
         "relationships": [
-            # TODO fix replicate in BUV dep many empty vals
-            # TODO fix the predefined 0, for now not a problem as no survey has more than 9 entries
             {
                 "column": "DropID",
                 "rule": "equals",
@@ -121,16 +119,16 @@ VALIDATION_RULES = {
                 "column": "FileName",
                 "rule": "equals",
                 "template": "{DropID}.mp4",
-                # TODO: Remove null allowed
                 "allowed_values": ["NO VIDEO BAD DEPLOYMENT"],
+                # TODO: Remove null allowed
                 "allow_null": True,
             },
             {
                 "column": "LinkToVideoFile",
                 "rule": "equals",
                 "template": "media/{SurveyID}/{DropID}/{DropID}.mp4",
-                # TODO: Remove null allowed
                 "allowed_values": ["NO VIDEO BAD DEPLOYMENT"],
+                # TODO: Remove null allowed
                 "allow_null": True,
             },
         ],
