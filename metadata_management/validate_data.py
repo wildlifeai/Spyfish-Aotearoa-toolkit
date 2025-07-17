@@ -91,7 +91,7 @@ class SharepointValidator:
 
         return self.errors_df
 
-    def _iterate_df(
+    def _add_relevant_error_info_for_row(
         self,
         row,
         file_name=None,
@@ -144,7 +144,7 @@ class SharepointValidator:
                 continue
             na_rows = df[df[col].isna()]
             na_rows.apply(
-                self._iterate_df,
+                self._add_relevant_error_info_for_row,
                 file_name=file_name,
                 col_name=col,
                 info_columns=info_columns,
@@ -169,7 +169,7 @@ class SharepointValidator:
             # Check for Duplicates in unique columns
             duplicated = df[df[col].duplicated(keep=False) & df[col].notna()]
             duplicated.apply(
-                self._iterate_df,
+                self._add_relevant_error_info_for_row,
                 file_name=file_name,
                 col_name=col,
                 check="duplicate",
@@ -219,7 +219,7 @@ class SharepointValidator:
             missing = source_df[~source_df[fk_col].isin(target_df[fk_col])]
             fk_file_name = Path(target_rules["file_name"]).name
             missing.apply(
-                self._iterate_df,
+                self._add_relevant_error_info_for_row,
                 file_name=source_file,
                 col_name=fk_col,
                 fk_file_name=fk_file_name,
@@ -236,7 +236,7 @@ class SharepointValidator:
             invalid = df[~df[col].isna() & ~df[col].astype(str).str.match(pattern)]
 
             invalid.apply(
-                self._iterate_df,
+                self._add_relevant_error_info_for_row,
                 file_name=source_file,
                 col_name=col,
                 pattern=pattern,
