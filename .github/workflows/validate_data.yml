@@ -1,0 +1,35 @@
+name: Validate data and export error report into S3 bucket
+
+on:
+  workflow_dispatch: # Allows manual triggering
+  schedule:
+    # Runs every Sunday at 02:00 UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  upload-to-s3:
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        # Cache for pip dependencies
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install .
+
+    - name: Run error checking script
+      run: |
+        python metadata_management/validate_data.py
+      env:
+        S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

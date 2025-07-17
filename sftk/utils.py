@@ -4,6 +4,7 @@ import re
 from contextlib import contextmanager
 from typing import Any, Iterable, List, Optional, cast
 
+import numpy as np
 import pandas as pd
 
 
@@ -157,6 +158,27 @@ def get_unique_entries_df_column(
         csv_filepaths = set(buv_deployment_df[column_name_to_extract])
 
     return csv_filepaths
+
+
+# Function to check if a float column contains only whole numbers
+def convert_int_num_columns_to_int(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert numeric columns with whole numbers to nullable integers in-place.
+
+    This function iterates through all numeric columns of a DataFrame. If a column's
+    non-null values are all whole numbers, it converts the column to pandas'
+    nullable 'Int64' dtype. This modification is done in-place.
+
+    Args:
+        df: The DataFrame to modify.
+
+    Returns:
+        The modified DataFrame with integer columns converted.
+    """
+    for col in df.select_dtypes(include=[np.number]).columns:
+        series_no_na = df[col].dropna()
+        if not series_no_na.empty and np.all(series_no_na == series_no_na.astype(int)):
+            df[col] = df[col].astype("Int64")  # Use pandas nullable Int type
+    return df
 
 
 @contextmanager
