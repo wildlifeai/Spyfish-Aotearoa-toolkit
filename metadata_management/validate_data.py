@@ -18,10 +18,10 @@ from sftk.s3_handler import S3FileNotFoundError, S3Handler
 
 @dataclass
 class ErrorChecking:
-    ColumnName: Optional[str]
-    RelevantColumnsValue: Optional[str]
-    RelevantFile: str
-    ErrorInfo: str
+    column_name: Optional[str]
+    relevant_columns_value: Optional[str]
+    relevant_file: str
+    error_info: str
 
 
 class SharepointValidator:
@@ -65,14 +65,13 @@ class SharepointValidator:
             file_name = Path(rules.get("file_name", "")).name
             df = rules.get("dataset", pd.DataFrame())
 
-            if df is None:
+            if df.empty:
                 self._add_error(
                     file_name=file_name, message="Dataset could not be loaded."
                 )
                 continue
 
-            # change numerical values into integers if relevant
-
+            # change numerical values into integers where possible
             df = convert_int_num_columns_to_int(df)
 
             if required:
@@ -86,7 +85,7 @@ class SharepointValidator:
             if column_relationships:
                 self._check_column_relationships(rules, df)
 
-        self._get_df(remove_duplicates)
+        self._export_errors_from_list_to_df(remove_duplicates)
 
         return self.errors_df
 
@@ -293,28 +292,28 @@ class SharepointValidator:
     ):
         self.errors.append(
             ErrorChecking(
-                ColumnName=column_name,
-                RelevantColumnsValue=relevant_column_value,
-                RelevantFile=Path(file_name).name if file_name else "unknown_file",
-                ErrorInfo=message,
+                column_name=column_name,
+                relevant_columns_value=relevant_column_value,
+                relevant_file=Path(file_name).name if file_name else "unknown_file",
+                error_info=message,
             )
         )
 
-    def _get_df(self, remove_duplicates):
+    def _export_errors_from_list_to_df(self, remove_duplicates):
         self.errors_df = pd.DataFrame([e.__dict__ for e in self.errors])
 
         if remove_duplicates:
             self._deduplicate_errors()
+        self.errors = []
 
     def _deduplicate_errors(self):
         if self.errors_df.empty:
             return
 
         key_cols = list(ErrorChecking.__dataclass_fields__.keys())
-        self.errors_df.drop_duplicates(subset=key_cols, ignore_index=True, inplace=True)
-        self.errors = [
-            ErrorChecking(**row) for row in self.errors_df.to_dict(orient="records")
-        ]
+        self.errors_df = self.errors_df.drop_duplicates(
+            subset=key_cols, ignore_index=True
+        )
 
     def export_to_csv(self, csv_file_name="validation_errors_cleaned.csv"):
         self.errors_df["ErrorSource"] = "Sharepoint error validation"
@@ -356,6 +355,6 @@ if __name__ == "__main__":
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"
     )
     # Export to csv
-    # validator.export_to_csv("validation_errors.csv")
-    validator.upload_to_s3()
+    validator.export_to_csv("validation_errors.csv")
+    # validator.upload_to_s3()
     logging.info("Error validation process completed, files created/uploaded.")

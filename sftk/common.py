@@ -1,4 +1,3 @@
-import getpass
 import os
 
 from dotenv import load_dotenv
@@ -46,19 +45,8 @@ BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")  # api token get from ui
 # Ask for user input if the env variables are not found.
 # TODO check ways to set variables, if there are issues reading the .env file
 S3_BUCKET = os.getenv("S3_BUCKET")
-if not S3_BUCKET:
-    S3_BUCKET = input("Enter your S3_BUCKET: ")
-    os.environ["S3_BUCKET"] = S3_BUCKET
-
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-if not AWS_ACCESS_KEY_ID:
-    AWS_ACCESS_KEY_ID = input("Enter your AWS_ACCESS_KEY_ID: ")
-    os.environ["AWS_ACCESS_KEY_ID"] = AWS_ACCESS_KEY_ID
-
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-if not AWS_SECRET_ACCESS_KEY:
-    AWS_SECRET_ACCESS_KEY = getpass.getpass("Enter your AWS_SECRET_ACCESS_KEY: ")
-    os.environ["AWS_SECRET_ACCESS_KEY"] = AWS_SECRET_ACCESS_KEY
 
 
 S3_SHAREPOINT_PATH = os.path.join("spyfish_metadata", "sharepoint_lists")
