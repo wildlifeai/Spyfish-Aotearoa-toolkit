@@ -11,7 +11,6 @@ Steps:
 
 import logging
 import sys
-from dataclasses import dataclass
 from typing import Optional
 
 import pandas as pd
@@ -20,57 +19,13 @@ import pandas as pd
 # for the various keywords (survey, site, movie, species or test) using getattr
 import sftk.common
 from sftk.common import DEV_MODE, S3_BUCKET
-from sftk.s3_handler import S3FileNotFoundError, S3Handler
+from sftk.s3_handler import S3FileConfig, S3FileNotFoundError, S3Handler
 from sftk.utils import EnvironmentVariableError, temp_file_manager
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-
-@dataclass
-class S3FileConfig:
-    """
-    Configuration class for S3 file operations containing file paths and environment variables.
-
-    Attributes:
-        keyword (str): Identifier for the type of data (e.g., 'survey', 'site', 'movie')
-        kso_env_var (str): Environment variable name for KSO file path
-        sharepoint_env_var (str): Environment variable name for Sharepoint file path
-        kso_filename (str): Temporary filename for KSO data
-        sharepoint_filename (str): Temporary filename for Sharepoint data
-    """
-
-    keyword: str
-    kso_env_var: str
-    sharepoint_env_var: str
-    kso_filename: str
-    sharepoint_filename: str
-
-
-def get_s3_file_config(keyword: str) -> S3FileConfig:
-    """
-    Creates a configuration object for S3 file operations based on
-    a keyword (e.g., "survey", "site").
-
-    Args:
-        keyword(str): String identifier for the type of data
-
-    Returns:
-        S3FileConfig: The configuration information for S3 handler.
-    """
-
-    kso_env_var = f"S3_KSO_{keyword.upper()}_CSV"
-    sharepoint_env_var = f"S3_SHAREPOINT_{keyword.upper()}_CSV"
-
-    return S3FileConfig(
-        keyword=keyword,
-        kso_env_var=kso_env_var,
-        sharepoint_env_var=sharepoint_env_var,
-        kso_filename=f"{keyword}_kso_temp.csv",
-        sharepoint_filename=f"{keyword}_sharepoint_temp.csv",
-    )
 
 
 def process_s3_files(
@@ -94,7 +49,7 @@ def process_s3_files(
         sharepoint_df = None
 
         try:
-            config = get_s3_file_config(keyword)
+            config = S3FileConfig.from_keyword(keyword)
             # TODO error management if no var, similar to get_env_var to raise EnvironmentVariableError
             with temp_file_manager([config.kso_filename, config.sharepoint_filename]):
                 try:
@@ -553,7 +508,7 @@ def compare_and_update_dataframes(
     if dataframe_changed:
         # Upload to S3
         try:
-            config = get_s3_file_config(keyword)
+            config = S3FileConfig.from_keyword(keyword)
             s3_handler.upload_updated_df_to_s3(
                 df=updated_kso_df,
                 key=getattr(sftk.common, config.kso_env_var),
