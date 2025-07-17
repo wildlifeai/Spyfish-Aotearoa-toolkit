@@ -166,7 +166,9 @@ class S3Handler:
             return pd.read_csv(filename)
         except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
-            raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}") from e
+            raise S3FileNotFoundError(
+                f"Failed to download or read S3 file {key}: {e}"
+            ) from e
 
     def upload_updated_df_to_s3(
         self,

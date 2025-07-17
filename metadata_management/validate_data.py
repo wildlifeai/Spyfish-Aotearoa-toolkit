@@ -1,5 +1,6 @@
 import copy
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -7,6 +8,8 @@ from typing import Optional
 import pandas as pd
 
 from sftk.common import (
+    EXPORT_LOCAL,
+    LOCAL_DATA_FOLDER_PATH,
     S3_BUCKET,
     S3_KSO_ERRORS_CSV,
     VALIDATION_PATTERNS,
@@ -362,7 +365,11 @@ if __name__ == "__main__":
         f"Error validation completed, {validator.errors_df.shape[0]} errors found"
     )
     # Export to csv
-    # TODO add DEV_MOD£ variable to decide one or the other:
-    # validator.export_to_csv("validation_errors.csv")
-    validator.upload_to_s3()
+    # TODO add DEV_MODE variable to decide one or the other:
+    if EXPORT_LOCAL:
+        validator.export_to_csv(
+            os.path.join(LOCAL_DATA_FOLDER_PATH, "validation_errors.csv")
+        )
+    else:
+        validator.upload_to_s3()
     logging.info("Error validation process completed, files created/uploaded.")

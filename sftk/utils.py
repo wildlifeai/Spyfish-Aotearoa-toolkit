@@ -161,7 +161,19 @@ def get_unique_entries_df_column(
 
 
 # Function to check if a float column contains only whole numbers
-def convert_int_num_columns_to_int(df):
+def convert_int_num_columns_to_int(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert numeric columns with whole numbers to nullable integers in-place.
+
+    This function iterates through all numeric columns of a DataFrame. If a column's
+    non-null values are all whole numbers, it converts the column to pandas'
+    nullable 'Int64' dtype. This modification is done in-place.
+
+    Args:
+        df: The DataFrame to modify.
+
+    Returns:
+        The modified DataFrame with integer columns converted.
+    """
     for col in df.select_dtypes(include=[np.number]).columns:
         series_no_na = df[col].dropna()
         if not series_no_na.empty and np.all(series_no_na == series_no_na.astype(int)):

@@ -21,6 +21,10 @@ load_env_wrapper()
 
 # General settings
 DEV_MODE = os.getenv("DEV_MODE")
+EXPORT_LOCAL = os.getenv("EXPORT_LOCAL")
+
+LOCAL_DATA_FOLDER_PATH = os.getenv("LOCAL_DATA_FOLDER_PATH")
+
 
 # Email configuration
 EMAIL_USER = os.getenv("EMAIL_USER")
@@ -35,7 +39,6 @@ EMAIL_ARCHIVE_FOLDER_CANDIDATES = [
 ]
 EMAIL_ARCHIVE_FOLDER = "[Gmail]/All Mail"
 
-DATA_FOLDER_PATH = os.getenv("DATA_FOLDER_PATH")
 
 # Biigle credentials
 BIIGLE_API_EMAIL = os.getenv("BIIGLE_API_EMAIL")
