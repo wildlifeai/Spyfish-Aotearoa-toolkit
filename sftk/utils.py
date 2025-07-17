@@ -4,6 +4,7 @@ import re
 from contextlib import contextmanager
 from typing import Any, Iterable, List, Optional, cast
 
+import numpy as np
 import pandas as pd
 
 
@@ -157,6 +158,14 @@ def get_unique_entries_df_column(
         csv_filepaths = set(buv_deployment_df[column_name_to_extract])
 
     return csv_filepaths
+
+
+# Function to check if a float column contains only whole numbers
+def convert_int_num_columns_to_int(df):
+    for col in df.select_dtypes(include=[np.number]).columns:
+        if np.all(df[col].dropna() == df[col].dropna().astype(int)):
+            df[col] = df[col].astype("Int64")  # Use pandas nullable Int type
+    return df
 
 
 @contextmanager

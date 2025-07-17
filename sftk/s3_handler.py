@@ -140,9 +140,9 @@ class S3Handler:
                     Callback=progress_update,
                     Config=boto3.s3.transfer.TransferConfig(use_threads=False),
                 )
-        except Exception as e:
+        except BotoCoreError as e:
             logging.error("Failed to download %s from S3: %s", key, e)
-            raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}")
+            raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}") from e
 
     def download_and_read_s3_file(
         self, key: str, filename: str, bucket: str = S3_BUCKET
@@ -166,7 +166,7 @@ class S3Handler:
             return pd.read_csv(filename)
         except BotoCoreError as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
-            raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}")
+            raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}") from e
 
     def upload_updated_df_to_s3(
         self,

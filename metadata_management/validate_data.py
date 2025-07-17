@@ -6,7 +6,6 @@ from typing import Optional
 
 import pandas as pd
 
-from sftk.clean_data import convert_int_num_columns_to_int
 from sftk.common import (
     S3_BUCKET,
     S3_KSO_ERRORS_CSV,
@@ -14,6 +13,7 @@ from sftk.common import (
     VALIDATION_RULES,
 )
 from sftk.s3_handler import S3FileNotFoundError, S3Handler
+from sftk.utils import convert_int_num_columns_to_int
 
 
 @dataclass
@@ -179,14 +179,22 @@ class SharepointValidator:
         foreign_keys = rules.get("foreign_keys", {})
 
         for target_name, fk_col in foreign_keys.items():
-            target_rules = self.validation_rules.get(target_name)
-            target_df = target_rules.get("dataset", pd.DataFrame())
 
-            if not target_rules or target_df is None:
+            target_rules = self.validation_rules.get(target_name)
+            if not target_rules:
                 self._add_error(
                     column_name=fk_col,
                     file_name=source_file,
                     message=f"Foreign key check skipped: target dataset '{target_name}' not found",
+                )
+                continue
+
+            target_df = target_rules.get("dataset", pd.DataFrame())
+            if target_df.empty:
+                self._add_error(
+                    column_name=fk_col,
+                    file_name=source_file,
+                    message=f"Foreign key check skipped: target dataset '{target_name}' is empty or could not be loaded",
                 )
                 continue
 
