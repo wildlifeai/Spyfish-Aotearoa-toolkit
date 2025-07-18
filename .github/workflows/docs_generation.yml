@@ -2,11 +2,12 @@ name: Generate Documentation
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 0'
-  push:
-    branches:
-      - main
+  # TODO add schedule or triggers future if necessary:
+  # schedule:
+  #   - cron: '0 3 * * 0'
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
   generate_docs:
