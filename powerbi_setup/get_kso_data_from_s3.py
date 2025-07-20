@@ -177,6 +177,7 @@ def main(env_path=None):
             dataframes["sites"],
             dataframes["surveys"],
             dataframes["species"],
+            dataframes["errors"],
         )
 
     except Exception as process_error:
