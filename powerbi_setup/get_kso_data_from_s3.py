@@ -132,6 +132,7 @@ def main(env_path=None):
         "sites": "spyfish_metadata/kso_csvs/sites_buv_doc.csv",
         "surveys": "spyfish_metadata/kso_csvs/surveys_buv_doc.csv",
         "species": "spyfish_metadata/kso_csvs/species_buv_doc.csv",
+        "errors": "spyfish_metadata/kso_csvs/errors_buv_doc.csv",
     }
 
     # Load AWS credentials and create S3 client
