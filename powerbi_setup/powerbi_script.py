@@ -13,7 +13,7 @@ import sys
 import requests
 
 # Define the URL of the script
-script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/main/powerbi_setup/get_kso_data_from_s3.py"
+script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/f92cb426565699aa0b4214a9efd102f4d9eedab3/powerbi_setup/get_kso_data_from_s3.py"
 
 # Download the script content
 try:
