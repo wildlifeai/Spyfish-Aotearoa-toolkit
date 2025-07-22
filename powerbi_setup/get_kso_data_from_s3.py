@@ -167,17 +167,18 @@ def main(env_path=None):
         logging.info(
             f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
         )
-        return (
-            processed_annotations_df,
+        movies_df = (
             dataframes["movies"]
             .merge(
                 dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
                 on="SiteID",
                 how="left",
             )
-            .drop(
-                ["EventTimeEnd", "EventTimeStart"]
-            ),  # Temporarily remove eventtime variables to avoid powerbi loading issues
+            .drop(["EventTimeEnd", "EventTimeStart"], axis=1)
+        )  # Temporarily remove eventtime variables to avoid powerbi loading issues
+        return (
+            processed_annotations_df,
+            movies_df,
             dataframes["sites"],
             dataframes["surveys"],
             dataframes["species"],
