@@ -33,7 +33,7 @@ try:
     sys.modules["kso_to_pbi_module"] = kso_to_pbi_module
 
     # Run with error handling
-    processed_annotations_df, movies_df, sites_df, surveys_df, species_df = (
+    processed_annotations_df, movies_df, sites_df, surveys_df, species_df, errors_df = (
         kso_to_pbi_module.main(env_path)
     )
 

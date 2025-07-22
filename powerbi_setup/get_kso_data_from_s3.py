@@ -169,11 +169,15 @@ def main(env_path=None):
         )
         return (
             processed_annotations_df,
-            dataframes["movies"].merge(
+            dataframes["movies"]
+            .merge(
                 dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
                 on="SiteID",
                 how="left",
-            ),
+            )
+            .drop(
+                ["EventTimeEnd", "EventTimeStart"]
+            ),  # Temporarily remove eventtime variables to avoid powerbi loading issues
             dataframes["sites"],
             dataframes["surveys"],
             dataframes["species"],
