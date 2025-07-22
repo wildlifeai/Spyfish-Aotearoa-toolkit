@@ -167,15 +167,23 @@ def main(env_path=None):
         logging.info(
             f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
         )
-        movies_df = (
-            dataframes["movies"]
-            .merge(
-                dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
-                on="SiteID",
-                how="left",
-            )
-            .drop(["EventTimeEnd", "EventTimeStart"], axis=1)
-        )  # Temporarily remove eventtime variables to avoid powerbi loading issues
+
+        movies_df = dataframes["movies"].merge(
+            dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
+            on="SiteID",
+            how="left",
+        )
+
+        # List of columns to convert
+        time_columns = ["EventTimeStart", "EventTimeEnd"]
+
+        for col in time_columns:
+            # Convert to datetime, coercing errors to NaT (Not a Time)
+            # To avoid powerbi errors
+            movies_df[col] = pd.to_datetime(
+                movies_df[col], format="%H:%M", errors="coerce"
+            ).dt.time
+
         return (
             processed_annotations_df,
             movies_df,
