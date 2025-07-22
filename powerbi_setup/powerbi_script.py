@@ -38,5 +38,5 @@ try:
     )
 
 except Exception as e:
-    print(f"Error: {str(e)}")
+    print(f"Error: {str(e)}", file=sys.stderr)
     raise
