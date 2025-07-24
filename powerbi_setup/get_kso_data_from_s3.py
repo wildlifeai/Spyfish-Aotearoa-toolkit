@@ -132,6 +132,7 @@ def main(env_path=None):
         "sites": "spyfish_metadata/kso_csvs/sites_buv_doc.csv",
         "surveys": "spyfish_metadata/kso_csvs/surveys_buv_doc.csv",
         "species": "spyfish_metadata/kso_csvs/species_buv_doc.csv",
+        "errors": "spyfish_metadata/kso_csvs/errors_buv_doc.csv",
     }
 
     # Load AWS credentials and create S3 client
@@ -166,16 +167,30 @@ def main(env_path=None):
         logging.info(
             f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
         )
+
+        movies_df = dataframes["movies"].merge(
+            dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
+            on="SiteID",
+            how="left",
+        )
+
+        # List of columns to convert
+        time_columns = ["EventTimeStart", "EventTimeEnd"]
+
+        for col in time_columns:
+            # Convert to datetime, coercing errors to NaT (Not a Time)
+            # To avoid powerbi errors
+            movies_df[col] = pd.to_datetime(
+                movies_df[col], format="%H:%M", errors="coerce"
+            ).dt.time
+
         return (
             processed_annotations_df,
-            dataframes["movies"].merge(
-                dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
-                on="SiteID",
-                how="left",
-            ),
+            movies_df,
             dataframes["sites"],
             dataframes["surveys"],
             dataframes["species"],
+            dataframes["errors"],
         )
 
     except Exception as process_error:
