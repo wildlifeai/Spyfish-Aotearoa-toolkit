@@ -220,7 +220,7 @@ def standarise_sharepoint_to_kso(
             for df in (movie_sharepoint_df, site_sharepoint_df)
         )
 
-        # TODO why is this getting the year/Dire ID out? is this necessary now that we have dropIDs
+        # TODO why is this getting the year/Site ID out? is this necessary now that we have dropIDs
         # Extract the year from Survey
         movie_sharepoint_df["year"] = movie_sharepoint_df["SurveyID"].str[6:8]
 
@@ -301,12 +301,12 @@ def validate_dataframes(
     # Check for duplicates in unique identifier column
     if kso_df[unique_id_column].duplicated().any():
         validation_log.append(
-            "kso_df has duplicate values in the unique identifier column."
+            f"kso_df has duplicate values in the unique identifier column {unique_id_column}."
         )
 
     if sharepoint_df[unique_id_column].duplicated().any():
         validation_log.append(
-            "sharepoint_df has duplicate values in the unique identifier column."
+            f"sharepoint_df has duplicate values in the unique identifier column {unique_id_column}."
         )
 
     return validation_log
@@ -403,7 +403,7 @@ def compare_and_update_dataframes(
         kso_df = kso_df[~kso_df[unique_id_column].duplicated(keep=False)]
         sharepoint_df = sharepoint_df[
             ~sharepoint_df[unique_id_column].duplicated(keep=False)
-        ]
+        ].copy()
         logging.error("Validation issues found:")
         for issue in validation_issues:
             logging.error("- %s", issue)
