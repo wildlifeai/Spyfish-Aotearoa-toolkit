@@ -11,7 +11,11 @@ from botocore.exceptions import BotoCoreError
 from tqdm import tqdm
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
-from sftk.utils import delete_file
+from sftk.utils import (
+    delete_file,
+    filter_file_paths_by_extension,
+    get_unique_entries_df_column,
+)
 
 
 # TODO check when is this used
@@ -236,11 +240,63 @@ class S3Handler:
                     s3_filepaths.add(obj["Key"])
         return s3_filepaths
 
+    def get_paths_from_csv(
+        self,
+        csv_s3_path: str,
+        csv_column: str,
+        column_filter: Optional[str] = None,
+        column_value: Optional[Any] = None,
+        s3_bucket: str = S3_BUCKET,
+    ) -> pd.DataFrame:
+
+        logging.info(f"Processing CSV: {csv_s3_path}.")
+
+        # Load dataframe from AWS
+        csv_df = self.read_df_from_s3_csv(csv_s3_path, s3_bucket)
+
+        # Load unique file paths from the CSV column excluding the filtered values
+        csv_filepaths_without_filtered_values = get_unique_entries_df_column(
+            csv_df,
+            csv_column,
+            column_filter=column_filter,
+            column_value=column_value,
+        )
+        # Load all unique file paths from the CSV column
+        csv_filepaths_all = get_unique_entries_df_column(csv_df, csv_column)
+
+        logging.info(f"Unique file paths from CSV: {len(csv_filepaths_all)}.")
+        logging.info(
+            f"Unique file paths from CSV, without filtered value {column_filter} as {column_value}: {len(csv_filepaths_without_filtered_values)}."
+        )
+        # TODO why it has to be two different entries?
+        return csv_filepaths_all, csv_filepaths_without_filtered_values
+
+    def get_paths_from_s3(
+        self,
+        valid_extensions: Iterable[str] = [],
+        path_prefix: str = "",
+        s3_bucket: str = S3_BUCKET,
+    ) -> set[str]:
+        logging.info(f"Processing the files in the bucket: {s3_bucket}.")
+
+        # Get all file paths currently in S3
+        s3_filepaths = self.get_set_filenames_from_s3(
+            bucket=s3_bucket, prefix=path_prefix
+        )
+
+        # Filter only video files based on their extension
+        s3_video_filepaths = set(
+            # TODO does this work if valid extensions is not given? Write test.
+            filter_file_paths_by_extension(s3_filepaths, valid_extensions)
+        )
+        logging.info(f"Video files in S3: {len(s3_video_filepaths)}")
+        return s3_video_filepaths
+
     def rename_s3_objects_from_dict(
         self,
         rename_pairs: dict,
         prefix="",
-        suffixes: Iterable = {},
+        suffixes: Iterable = (),
         bucket=S3_BUCKET,
         try_run=False,
     ):

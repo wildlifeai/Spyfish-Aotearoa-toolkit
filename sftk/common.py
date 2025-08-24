@@ -1,6 +1,9 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+from sftk.utils import str_to_bool
 
 
 def load_env_wrapper() -> None:
@@ -21,9 +24,9 @@ load_env_wrapper()
 
 # General settings
 DEV_MODE = os.getenv("DEV_MODE")
-EXPORT_LOCAL = os.getenv("EXPORT_LOCAL")
+EXPORT_LOCAL = str_to_bool(os.getenv("EXPORT_LOCAL"))
 
-LOCAL_DATA_FOLDER_PATH = os.getenv("LOCAL_DATA_FOLDER_PATH")
+LOCAL_DATA_FOLDER_PATH = os.getenv("LOCAL_DATA_FOLDER_PATH", str(Path.cwd() / "data"))
 
 
 # Email configuration
@@ -100,6 +103,18 @@ MOVIE_EXTENSIONS = [
     "wmv",
 ]
 
+# TODO add documentation
+VIDEOS_IN_SHAREPOINT_INFO = {
+    "csv_filename": "BUV Deployment.csv",
+    "info_column": "LinkToVideoFile",
+    "column_filter": "IsBadDeployment",
+    "column_value": False,
+}
+
+VIDEOS_IN_AWS_INFO = {
+    "path_prefix": "media",
+    "valid_movie_extensions": MOVIE_EXTENSIONS,
+}
 
 VALIDATION_RULES = {
     "deployments": {
@@ -156,7 +171,10 @@ VALIDATION_RULES = {
     "species": {
         "file_name": S3_SHAREPOINT_SPECIES_CSV,
         "required": ["AphiaID", "CommonName", "ScientificName"],
-        "unique": ["AphiaID", "CommonName", "ScientificName"],
+        "unique": [
+            "AphiaID",
+            "ScientificName",
+        ],  # No need for "CommonName" to be unique
         "info_columns": ["AphiaID", "CommonName", "ScientificName"],
         "foreign_keys": {},
         "relationships": [],
