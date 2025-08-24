@@ -1,5 +1,5 @@
 import logging
-from functools import cache
+import os
 from datetime import datetime as dt
 from pathlib import Path
 
@@ -22,57 +22,6 @@ def _set_logging_path() -> str:
     log_file = log_dir / log_filename
     return str(log_file)
 
-@cache
-def convert_log_level(level: str) -> int:
-    """
-    Converts a string log level to a corresponding logging constant.
-
-    Args:
-        level (str): The logging level as a string (e.g., "DEBUG", "INFO").
-
-    Returns:
-        int: The corresponding logging level constant.
-    """
-    levels = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
-
-    return levels.get(level.upper(), logging.INFO)
-
-def set_log_level(level: str) -> None:
-    """
-    Dynamically sets the logging level for the root logger.
-
-    Args:
-        level (str): The logging level as a string (e.g., "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
-    """
-    global _LOG_LEVEL
-    level_dict = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
-
-    if level.upper() in level_dict:
-        logging.getLogger().setLevel(level_dict[level.upper()])
-        _LOG_LEVEL = level
-    else:
-        raise ValueError(f"Invalid log level: {level}")
-
-def get_log_level() -> str:
-    """
-    Retrieves the current logging level.
-
-    Returns:
-        str: The current logging level as a string (e.g., "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
-    """
-    return _LOG_LEVEL
 
 def clear_logs_directory() -> None:
     """
@@ -86,10 +35,19 @@ def clear_logs_directory() -> None:
 
 # Configure the logging module in global scope to ensure that all modules use the same configuration.
 LOG_PATH = _set_logging_path()
-_LOG_LEVEL = "INFO"
-logging.basicConfig(
-    filename=LOG_PATH,
-    level=convert_log_level(_LOG_LEVEL),
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    force=True,
-)
+
+# Simple configuration: use file logging if LOG_OUTPUT=file, otherwise console (default)
+if os.getenv("LOG_OUTPUT", "console").lower() == "file":
+    logging.basicConfig(
+        filename=LOG_PATH,
+        level="INFO",
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        force=True,
+    )
+else:
+    # Default to console output
+    logging.basicConfig(
+        level="INFO",
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        force=True,
+    )

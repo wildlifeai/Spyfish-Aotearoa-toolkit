@@ -18,14 +18,12 @@ import pandas as pd
 # These get used to retrieve the paths sharepoint and kso csv files from S3
 # for the various keywords (survey, site, movie, species or test) using getattr
 import sftk.common
+
+# Import centralized logging configuration
+from sftk import log_config  # noqa: F401
 from sftk.common import DEV_MODE, S3_BUCKET
 from sftk.s3_handler import S3FileConfig, S3FileNotFoundError, S3Handler
 from sftk.utils import EnvironmentVariableError, temp_file_manager
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 
 def process_s3_files(
@@ -579,12 +577,7 @@ def main():
 
 
 if __name__ == "__main__":
-    # Ensure logging is configured at the start
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        force=True,  # This will override any existing logging configuration
-    )
+    # Logging is configured by importing sftk.log_config
     logging.info("Script started")
     main()
     logging.info("Script completed")
