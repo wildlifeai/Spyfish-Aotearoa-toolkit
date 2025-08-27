@@ -66,10 +66,10 @@ def test_data_validator_with_file_presence():
     # Mock S3Handler for file presence validation
     mock_s3_handler = Mock()
     mock_s3_handler.read_df_from_s3_csv.return_value = pd.DataFrame()
-    mock_s3_handler.get_paths_from_csv.return_value = (
-        {"file1.mp4", "file2.mp4"},  # all files
-        {"file1.mp4"},  # filtered files
-    )
+    mock_s3_handler.get_paths_from_csv.return_value = {
+        "all": {"file1.mp4", "file2.mp4"},  # all files
+        "filtered": {"file1.mp4"},  # filtered files
+    }
     mock_s3_handler.get_paths_from_s3.return_value = {"file2.mp4"}  # S3 files
 
     with patch("sftk.data_validator.S3Handler", return_value=mock_s3_handler):

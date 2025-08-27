@@ -16,16 +16,34 @@ from sftk.data_validator import DataValidator
 from sftk.validation_strategies import ValidationConfig
 
 
-def main():
+def main(
+    enable_all: bool = False,
+    required: bool = False,
+    unique: bool = False,
+    foreign_keys: bool = False,
+    formats: bool = False,
+    column_relationships: bool = False,
+    file_presence: bool = False,
+    remove_duplicates: bool = True,
+    extract_clean_dataframes: bool = False,
+):
     """Main function to run data validation."""
     logging.info("Error validation started")
 
     # Create validator and configuration
     validator = DataValidator()
     config = ValidationConfig()
-    config.enable_all()  # Enable all validation types
-    config.file_presence = True
-    config.extract_clean_dataframes = True  # Enable clean dataframe extraction
+    config.remove_duplicates = remove_duplicates
+    config.extract_clean_dataframes = extract_clean_dataframes
+    if enable_all:
+        config.enable_all_validators()  # Enable all validation types
+    else:
+        config.required = required
+        config.unique = unique
+        config.foreign_keys = foreign_keys
+        config.formats = formats
+        config.column_relationships = column_relationships
+        config.file_presence = file_presence
 
     # Run validation using new interface
     result_df = validator.validate_with_config(config)
@@ -59,4 +77,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(
+        enable_all=True,
+        remove_duplicates=True,
+        extract_clean_dataframes=True,
+        # required = True,
+        # unique = True,
+        # foreign_keys = True,
+        # formats = True,
+        # column_relationships = True,
+        # file_presence = True,
+    )

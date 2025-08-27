@@ -247,9 +247,43 @@ class S3Handler:
         column_filter: Optional[str] = None,
         column_value: Optional[Any] = None,
         s3_bucket: str = S3_BUCKET,
-    ) -> tuple[set, set]:
-        # TODO add documentation
+    ) -> Dict[str, set]:
+        """
+        Extract unique file paths from a CSV file stored in S3.
 
+        This method reads a CSV file from S3 and extracts unique file paths from a specified
+        column. It returns two sets of paths: all unique paths from the column, and paths
+        excluding those from rows that match optional filter criteria.
+
+        Args:
+            csv_s3_path: S3 path to the CSV file (without bucket name)
+            csv_column: Name of the column containing file paths to extract
+            column_filter: Optional column name to filter rows by
+            column_value: Value that the filter column must equal to exclude rows
+            s3_bucket: S3 bucket name (defaults to S3_BUCKET constant)
+
+        Returns:
+            Dictionary with two keys:
+            - 'all': Set of all unique file paths from the specified column
+            - 'filtered': Set of unique file paths excluding rows where
+              column_filter equals column_value
+
+        Example:
+            >>> handler = S3Handler()
+            >>> result = handler.get_paths_from_csv(
+            ...     csv_s3_path="data/BUV Deployments.csv",
+            ...     csv_column="LinkToVideoFile",
+            ...     column_filter="IsBadDeployment",
+            ...     column_value=False
+            ... )
+            >>> print(f"All paths: {len(result['all'])}")
+            >>> print(f"Valid paths: {len(result['filtered'])}")
+
+        Note:
+            The 'all' set is used to check for extra files in S3 (a file in S3 is not
+            extra if it appears anywhere in the CSV). The 'filtered' set is used to
+            check for missing files (a file is only missing if it's from a valid deployment).
+        """
         logging.info(f"Processing CSV: {csv_s3_path}.")
 
         # Load dataframe from AWS
@@ -269,11 +303,11 @@ class S3Handler:
         logging.info(
             f"Unique file paths from CSV, without filtered value {column_filter} as {column_value}: {len(csv_filepaths_without_filtered_values)}."
         )
-        # TODO: check if there is a way to do it in one output?
-        # Return two sets: all paths from the CSV, and paths excluding filtered values.
-        # 'all' is used to check for extra files in S3 (a file in S3 is not extra if it's anywhere in the CSV).
-        # 'without_filtered_values' is used to check for missing files (a file is only missing if it's from a valid deployment).
-        return csv_filepaths_all, csv_filepaths_without_filtered_values
+
+        return {
+            "all": csv_filepaths_all,
+            "filtered": csv_filepaths_without_filtered_values,
+        }
 
     def get_paths_from_s3(
         self,

@@ -7,6 +7,7 @@ data validation using various validation strategies.
 
 import copy
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -223,7 +224,7 @@ class DataValidator:
         """
         # Ensure at least one validation type is enabled
         if not config.any_enabled():
-            config.enable_all()
+            config.enable_all_validators()
 
         # Initialize clean row tracker if requested
         if config.extract_clean_dataframes:
@@ -422,8 +423,6 @@ class DataValidator:
             - CSV files are exported without DataFrame index
             - Empty dataframes are skipped
         """
-        import os
-
         if not self.clean_row_tracker:
             raise ValueError(
                 "Clean dataframes not available. Enable extract_clean_dataframes "
@@ -478,7 +477,10 @@ class DataValidator:
         logging.info(f"Updated {keyword} DataFrame uploaded to S3")
 
     def export_file_differences(
-        self, missing_files_path: str, extra_files_path: str
+        self,
+        missing_files_path: str,
+        extra_files_path: str,
+        file_presence_rules: Dict[str, Any] = FILE_PRESENCE_RULES,
     ) -> None:
         """
         Export file differences to separate text files.
@@ -490,6 +492,8 @@ class DataValidator:
         Args:
             missing_files_path: Path for the missing files output file
             extra_files_path: Path for the extra files output file
+            file_presence_rules: Optional dictionary containing file presence validation rules.
+                If None, uses the default FILE_PRESENCE_RULES from sftk.common.
 
         Side Effects:
             - Creates two text files with file paths, one per line
@@ -508,7 +512,7 @@ class DataValidator:
 
             # Get file differences using the existing validator
             missing_files, extra_files = file_presence_validator.get_file_differences(
-                FILE_PRESENCE_RULES
+                file_presence_rules
             )
 
             # Write to text files

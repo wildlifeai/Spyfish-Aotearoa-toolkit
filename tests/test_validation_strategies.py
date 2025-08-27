@@ -15,7 +15,7 @@ def test_validation_config_enable_all():
     from sftk.validation_strategies import ValidationConfig
 
     config = ValidationConfig()
-    config.enable_all()
+    config.enable_all_validators()
     assert config.required is True
     assert config.unique is True
 
@@ -177,10 +177,10 @@ def test_file_presence_validator():
 
     # Mock S3Handler
     mock_s3_handler = Mock()
-    mock_s3_handler.get_paths_from_csv.return_value = (
-        {"file1.mp4", "file2.mp4", "file3.mp4"},  # all files
-        {"file1.mp4", "file2.mp4"},  # filtered files
-    )
+    mock_s3_handler.get_paths_from_csv.return_value = {
+        "all": {"file1.mp4", "file2.mp4", "file3.mp4"},  # all files
+        "filtered": {"file1.mp4", "file2.mp4"},  # filtered files
+    }
     mock_s3_handler.get_paths_from_s3.return_value = {
         "file1.mp4",
         "file4.mp4",
@@ -219,10 +219,10 @@ def test_file_presence_validator_get_file_differences():
 
     # Mock S3Handler
     mock_s3_handler = Mock()
-    mock_s3_handler.get_paths_from_csv.return_value = (
-        {"file1.mp4", "file2.mp4", "file3.mp4"},  # all files
-        {"file1.mp4", "file2.mp4"},  # filtered files
-    )
+    mock_s3_handler.get_paths_from_csv.return_value = {
+        "all": {"file1.mp4", "file2.mp4", "file3.mp4"},  # all files
+        "filtered": {"file1.mp4", "file2.mp4"},  # filtered files
+    }
     mock_s3_handler.get_paths_from_s3.return_value = {
         "file1.mp4",
         "file4.mp4",
@@ -303,7 +303,7 @@ def test_validation_config_methods_consistency():
     assert not config.any_enabled()
 
     # Enable all should enable everything
-    config.enable_all()
+    config.enable_all_validators()
     assert config.any_enabled()
     assert config.required
     assert config.unique

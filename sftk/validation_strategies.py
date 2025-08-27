@@ -109,7 +109,7 @@ class ValidationConfig:
         10000  # Limit errors per validator to prevent memory issues
     )
 
-    def enable_all(self) -> None:
+    def enable_all_validators(self) -> None:
         """Enable all validation types."""
         validation_fields = self._get_validation_fields()
         for field_name in validation_fields:
@@ -798,13 +798,15 @@ class FilePresenceValidator(ValidationStrategy):
 
         # Get file paths from CSV
         csv_s3_path = f"{s3_sharepoint_path}/{csv_filename}".strip("/")
-        csv_filepaths_all, csv_filepaths_filtered = self.s3_handler.get_paths_from_csv(
+        csv_paths_result = self.s3_handler.get_paths_from_csv(
             csv_s3_path=csv_s3_path,
             csv_column=csv_column_to_extract,
             column_filter=column_filter,
             column_value=column_value,
             s3_bucket=bucket,
         )
+        csv_filepaths_all = csv_paths_result["all"]
+        csv_filepaths_filtered = csv_paths_result["filtered"]
 
         # Get file paths from S3
         s3_video_filepaths = self.s3_handler.get_paths_from_s3(
