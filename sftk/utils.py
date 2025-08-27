@@ -2,10 +2,26 @@ import logging
 import os
 import re
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, cast
 
 import numpy as np
 import pandas as pd
+
+
+def normalize_file_name(file_name: Any) -> str:
+    """
+    Normalize file name by extracting just the filename from a path.
+
+    Args:
+        file_name: File name or path (str, Path, or other)
+
+    Returns:
+        str: Just the filename portion, or original value if not a path
+    """
+    if isinstance(file_name, (str, Path)):
+        return Path(file_name).name
+    return file_name
 
 
 def flatten_list(lst: list[list]) -> list:
@@ -75,6 +91,12 @@ def get_env_var(name: str) -> str:
     if value is None:
         raise EnvironmentVariableError(f"Environment variable '{name}' not set.")
     return cast(str, value)
+
+
+def str_to_bool(value: Optional[str]) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in ("true")
 
 
 def delete_file(filename: str):
@@ -179,6 +201,28 @@ def convert_int_num_columns_to_int(df: pd.DataFrame) -> pd.DataFrame:
         if not series_no_na.empty and np.all(series_no_na == series_no_na.astype(int)):
             df[col] = df[col].astype("Int64")  # Use pandas nullable Int type
     return df
+
+
+def write_files_to_txt(file_set: set[str], output_path: str) -> None:
+    """
+    Write a set of file paths to a text file, one path per line.
+
+    Args:
+        file_set: Set of file paths to write
+        output_path: Path to the output text file
+
+    Side Effects:
+        - Creates or overwrites the file at output_path
+        - Logs the operation
+    """
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            for file_path in sorted(file_set):
+                f.write(f"{file_path}\n")
+        logging.info(f"Wrote {len(file_set)} file paths to {output_path}")
+    except (IOError, OSError) as e:
+        logging.error(f"Failed to write file paths to {output_path}: {e}")
+        raise
 
 
 @contextmanager

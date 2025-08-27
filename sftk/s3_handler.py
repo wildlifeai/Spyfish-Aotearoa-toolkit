@@ -11,7 +11,11 @@ from botocore.exceptions import BotoCoreError
 from tqdm import tqdm
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
-from sftk.utils import delete_file
+from sftk.utils import (
+    delete_file,
+    filter_file_paths_by_extension,
+    get_unique_entries_df_column,
+)
 
 
 # TODO check when is this used
@@ -236,11 +240,102 @@ class S3Handler:
                     s3_filepaths.add(obj["Key"])
         return s3_filepaths
 
+    def get_paths_from_csv(
+        self,
+        csv_s3_path: str,
+        csv_column: str,
+        column_filter: Optional[str] = None,
+        column_value: Optional[Any] = None,
+        s3_bucket: str = S3_BUCKET,
+    ) -> Dict[str, set]:
+        """
+        Extract unique file paths from a CSV file stored in S3.
+
+        This method reads a CSV file from S3 and extracts unique file paths from a specified
+        column. It returns two sets of paths: all unique paths from the column, and paths
+        excluding those from rows that match optional filter criteria.
+
+        Args:
+            csv_s3_path: S3 path to the CSV file (without bucket name)
+            csv_column: Name of the column containing file paths to extract
+            column_filter: Optional column name to filter rows by
+            column_value: Value that the filter column must equal to exclude rows
+            s3_bucket: S3 bucket name (defaults to S3_BUCKET constant)
+
+        Returns:
+            Dictionary with two keys:
+            - 'all': Set of all unique file paths from the specified column
+            - 'filtered': Set of unique file paths excluding rows where
+              column_filter equals column_value
+
+        Example:
+            >>> handler = S3Handler()
+            >>> result = handler.get_paths_from_csv(
+            ...     csv_s3_path="data/BUV Deployments.csv",
+            ...     csv_column="LinkToVideoFile",
+            ...     column_filter="IsBadDeployment",
+            ...     column_value=False
+            ... )
+            >>> print(f"All paths: {len(result['all'])}")
+            >>> print(f"Valid paths: {len(result['filtered'])}")
+
+        Note:
+            The 'all' set is used to check for extra files in S3 (a file in S3 is not
+            extra if it appears anywhere in the CSV). The 'filtered' set is used to
+            check for missing files (a file is only missing if it's from a valid deployment).
+        """
+        logging.info(f"Processing CSV: {csv_s3_path}.")
+
+        # Load dataframe from AWS
+        csv_df = self.read_df_from_s3_csv(csv_s3_path, s3_bucket)
+
+        # Load unique file paths from the CSV column excluding the filtered values
+        csv_filepaths_without_filtered_values = get_unique_entries_df_column(
+            csv_df,
+            csv_column,
+            column_filter=column_filter,
+            column_value=column_value,
+        )
+        # Load all unique file paths from the CSV column
+        csv_filepaths_all = get_unique_entries_df_column(csv_df, csv_column)
+
+        logging.info(f"Unique file paths from CSV: {len(csv_filepaths_all)}.")
+        logging.info(
+            f"Unique file paths from CSV, without filtered value {column_filter} as {column_value}: {len(csv_filepaths_without_filtered_values)}."
+        )
+
+        return {
+            "all": csv_filepaths_all,
+            "filtered": csv_filepaths_without_filtered_values,
+        }
+
+    def get_paths_from_s3(
+        self,
+        valid_extensions: Iterable[str] = [],
+        path_prefix: str = "",
+        s3_bucket: str = S3_BUCKET,
+    ) -> set[str]:
+        logging.info(f"Processing the files in the bucket: {s3_bucket}.")
+
+        # Get all file paths currently in S3
+        s3_filepaths = self.get_set_filenames_from_s3(
+            bucket=s3_bucket, prefix=path_prefix
+        )
+
+        if valid_extensions:
+            s3_filepaths = filter_file_paths_by_extension(
+                s3_filepaths, valid_extensions
+            )
+        # Filter only video files based on their extension
+        s3_filepaths_set = set(s3_filepaths)
+        logging.info(f"Video files in S3: {len(s3_filepaths_set)}")
+        return s3_filepaths_set
+
     def rename_s3_objects_from_dict(
         self,
         rename_pairs: dict,
         prefix="",
-        suffixes: Iterable = {},
+        suffixes: Iterable = (),
         bucket=S3_BUCKET,
         try_run=False,
     ):

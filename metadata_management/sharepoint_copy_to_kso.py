@@ -18,14 +18,12 @@ import pandas as pd
 # These get used to retrieve the paths sharepoint and kso csv files from S3
 # for the various keywords (survey, site, movie, species or test) using getattr
 import sftk.common
+
+# Import centralized logging configuration
+from sftk import log_config  # noqa: F401
 from sftk.common import DEV_MODE, S3_BUCKET
 from sftk.s3_handler import S3FileConfig, S3FileNotFoundError, S3Handler
 from sftk.utils import EnvironmentVariableError, temp_file_manager
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 
 def process_s3_files(
@@ -220,7 +218,7 @@ def standarise_sharepoint_to_kso(
             for df in (movie_sharepoint_df, site_sharepoint_df)
         )
 
-        # TODO why is this getting the year/Dire ID out? is this necessary now that we have dropIDs
+        # TODO why is this getting the year/Site ID out? is this necessary now that we have dropIDs
         # Extract the year from Survey
         movie_sharepoint_df["year"] = movie_sharepoint_df["SurveyID"].str[6:8]
 
@@ -301,12 +299,12 @@ def validate_dataframes(
     # Check for duplicates in unique identifier column
     if kso_df[unique_id_column].duplicated().any():
         validation_log.append(
-            "kso_df has duplicate values in the unique identifier column."
+            f"kso_df has duplicate values in the unique identifier column {unique_id_column}."
         )
 
     if sharepoint_df[unique_id_column].duplicated().any():
         validation_log.append(
-            "sharepoint_df has duplicate values in the unique identifier column."
+            f"sharepoint_df has duplicate values in the unique identifier column {unique_id_column}."
         )
 
     return validation_log
@@ -400,10 +398,10 @@ def compare_and_update_dataframes(
     # Validate DataFrames
     validation_issues = validate_dataframes(kso_df, sharepoint_df, unique_id_column)
     if validation_issues:
-        kso_df = kso_df[~kso_df[unique_id_column].duplicated(keep=False)]
+        kso_df = kso_df[~kso_df[unique_id_column].duplicated(keep=False)].copy()
         sharepoint_df = sharepoint_df[
             ~sharepoint_df[unique_id_column].duplicated(keep=False)
-        ]
+        ].copy()
         logging.error("Validation issues found:")
         for issue in validation_issues:
             logging.error("- %s", issue)
@@ -579,12 +577,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Ensure logging is configured at the start
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        force=True,  # This will override any existing logging configuration
-    )
     logging.info("Script started")
     main()
     logging.info("Script completed")
