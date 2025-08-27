@@ -25,20 +25,10 @@ class ErrorChecking:
     error_source: str
 
 
-class ValidationCheckType(Enum):
-    """Enumeration of validation check types."""
-
-    REQUIRED = "required"
-    DUPLICATE = "duplicate"
-    MISSING_FK = "missing_fk"
-    INVALID_FORMAT = "invalid_format"
-    RELATIONSHIP = "relationship"
-
-
 class ErrorSource(Enum):
     """Enumeration of error sources."""
 
-    SHAREPOINT_VALIDATION = "Sharepoint error validation"
+    SHAREPOINT_VALIDATION = "sharepoint_data_error"
     FILE_PRESENCE_CHECK = "file_presence_check"
 
 
@@ -163,47 +153,6 @@ class ValidationStrategy(ABC):
         )
 
 
-class ErrorMessageBuilder:
-    """Centralized error message generation."""
-
-    @staticmethod
-    def build_message(
-        check_type: ValidationCheckType,
-        col_name: str,
-        relevant_column_info: Any,
-        **kwargs,
-    ) -> str:
-        """
-        Build error message based on validation check type.
-
-        Args:
-            check_type: Type of validation check
-            col_name: Column name that failed validation
-            relevant_column_info: Relevant column information for context
-            **kwargs: Additional context (fk_file_name, pattern, etc.)
-
-        Returns:
-            Formatted error message
-        """
-        if check_type == ValidationCheckType.REQUIRED:
-            return f"Missing value in required column '{col_name}', help_info: {relevant_column_info}."
-        elif check_type == ValidationCheckType.DUPLICATE:
-            return f"Duplicate value in unique column '{col_name}'"
-        elif check_type == ValidationCheckType.MISSING_FK:
-            fk_file_name = kwargs.get("fk_file_name", "unknown")
-            return f"Foreign key '{col_name}' = '{kwargs.get('actual_value', 'unknown')}' not found in '{fk_file_name}'"
-        elif check_type == ValidationCheckType.INVALID_FORMAT:
-            pattern = kwargs.get("pattern", "unknown")
-            actual_value = kwargs.get("actual_value", "unknown")
-            return f"Value {actual_value} does not match required format for {col_name}: expected pattern '{pattern}'"
-        elif check_type == ValidationCheckType.RELATIONSHIP:
-            expected = kwargs.get("expected", "unknown")
-            actual = kwargs.get("actual", "unknown")
-            return f"{col_name} should be '{expected}', but is '{actual}'"
-        else:
-            return "No error type set."
-
-
 class RequiredValidator(ValidationStrategy):
     """Validator for required column checks."""
 
@@ -239,7 +188,6 @@ class RequiredValidator(ValidationStrategy):
                     file_name=file_name,
                     col_name=col,
                     info_columns=info_columns,
-                    check_type=ValidationCheckType.REQUIRED,
                 )
                 if error:
                     errors.append(error)
@@ -252,7 +200,6 @@ class RequiredValidator(ValidationStrategy):
         file_name: str,
         col_name: str,
         info_columns: List[str],
-        check_type: ValidationCheckType,
         **kwargs,
     ) -> Optional[ErrorChecking]:
         """Create error for a specific row that failed validation."""
@@ -264,7 +211,7 @@ class RequiredValidator(ValidationStrategy):
             relevant_column_info = row[col_name]
         except KeyError as e:
             relevant_column_info = (
-                f"No {col_name} in row for check {check_type.value}, error: {e}"
+                f"No {col_name} in row for check required, error: {e}"
             )
 
         # For missing values, use info columns for context
@@ -278,12 +225,7 @@ class RequiredValidator(ValidationStrategy):
         elif pd.isna(relevant_column_info):
             relevant_column_info = "N/A"
 
-        message = ErrorMessageBuilder.build_message(
-            check_type=check_type,
-            col_name=col_name,
-            relevant_column_info=relevant_column_info,
-            **kwargs,
-        )
+        message = f"Missing value in required column '{col_name}', help_info: {relevant_column_info}."
 
         return self._create_error(
             column_name=col_name,
@@ -330,7 +272,6 @@ class UniqueValidator(ValidationStrategy):
                     file_name=file_name,
                     col_name=col,
                     info_columns=info_columns,
-                    check_type=ValidationCheckType.DUPLICATE,
                 )
                 if error:
                     errors.append(error)
@@ -343,7 +284,6 @@ class UniqueValidator(ValidationStrategy):
         file_name: str,
         col_name: str,
         info_columns: List[str],
-        check_type: ValidationCheckType,
         **kwargs,
     ) -> Optional[ErrorChecking]:
         """Create error for a specific row that failed validation."""
@@ -354,7 +294,7 @@ class UniqueValidator(ValidationStrategy):
             relevant_column_info = row[col_name]
         except KeyError as e:
             relevant_column_info = (
-                f"No {col_name} in row for check {check_type.value}, error: {e}"
+                f"No {col_name} in row for check duplicate, error: {e}"
             )
 
         if pd.isna(relevant_column_info):
@@ -365,12 +305,7 @@ class UniqueValidator(ValidationStrategy):
                 ]
             )
 
-        message = ErrorMessageBuilder.build_message(
-            check_type=check_type,
-            col_name=col_name,
-            relevant_column_info=relevant_column_info,
-            **kwargs,
-        )
+        message = f"Duplicate value in unique column '{col_name}'"
 
         return self._create_error(
             column_name=col_name,
@@ -421,7 +356,6 @@ class FormatValidator(ValidationStrategy):
                     file_name=file_name,
                     col_name=col,
                     info_columns=info_columns,
-                    check_type=ValidationCheckType.INVALID_FORMAT,
                     pattern=pattern,
                     actual_value=row[col],
                 )
@@ -436,7 +370,6 @@ class FormatValidator(ValidationStrategy):
         file_name: str,
         col_name: str,
         info_columns: List[str],
-        check_type: ValidationCheckType,
         **kwargs,
     ) -> Optional[ErrorChecking]:
         """Create error for a specific row that failed validation."""
@@ -447,7 +380,7 @@ class FormatValidator(ValidationStrategy):
             relevant_column_info = row[col_name]
         except KeyError as e:
             relevant_column_info = (
-                f"No {col_name} in row for check {check_type.value}, error: {e}"
+                f"No {col_name} in row for check invalid_format, error: {e}"
             )
 
         if pd.isna(relevant_column_info):
@@ -458,12 +391,9 @@ class FormatValidator(ValidationStrategy):
                 ]
             )
 
-        message = ErrorMessageBuilder.build_message(
-            check_type=check_type,
-            col_name=col_name,
-            relevant_column_info=relevant_column_info,
-            **kwargs,
-        )
+        pattern = kwargs.get("pattern", "unknown")
+        actual_value = kwargs.get("actual_value", "unknown")
+        message = f"Value {actual_value} does not match required format for {col_name}: expected pattern '{pattern}'"
 
         return self._create_error(
             column_name=col_name,
@@ -539,7 +469,6 @@ class ForeignKeyValidator(ValidationStrategy):
                     file_name=source_file,
                     col_name=fk_col,
                     info_columns=info_columns,
-                    check_type=ValidationCheckType.MISSING_FK,
                     fk_file_name=fk_file_name,
                     actual_value=row[fk_col],
                 )
@@ -554,7 +483,6 @@ class ForeignKeyValidator(ValidationStrategy):
         file_name: str,
         col_name: str,
         info_columns: List[str],
-        check_type: ValidationCheckType,
         **kwargs,
     ) -> Optional[ErrorChecking]:
         """Create error for a specific row that failed validation."""
@@ -565,7 +493,7 @@ class ForeignKeyValidator(ValidationStrategy):
             relevant_column_info = row[col_name]
         except KeyError as e:
             relevant_column_info = (
-                f"No {col_name} in row for check {check_type.value}, error: {e}"
+                f"No {col_name} in row for check missing_fk, error: {e}"
             )
 
         if pd.isna(relevant_column_info):
@@ -576,11 +504,10 @@ class ForeignKeyValidator(ValidationStrategy):
                 ]
             )
 
-        message = ErrorMessageBuilder.build_message(
-            check_type=check_type,
-            col_name=col_name,
-            relevant_column_info=relevant_column_info,
-            **kwargs,
+        fk_file_name = kwargs.get("fk_file_name", "unknown")
+        actual_value = kwargs.get("actual_value", "unknown")
+        message = (
+            f"Foreign key '{col_name}' = '{actual_value}' not found in '{fk_file_name}'"
         )
 
         return self._create_error(
@@ -659,13 +586,7 @@ class RelationshipValidator(ValidationStrategy):
             )
 
         if rule == "equals" and str(actual) != str(expected):
-            message = ErrorMessageBuilder.build_message(
-                check_type=ValidationCheckType.RELATIONSHIP,
-                col_name=col_name,
-                relevant_column_info=actual,
-                expected=expected,
-                actual=actual,
-            )
+            message = f"{col_name} should be '{expected}', but is '{actual}'"
 
             return self._create_error(
                 column_name=col_name,

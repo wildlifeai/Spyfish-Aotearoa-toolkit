@@ -18,7 +18,6 @@ from sftk.validation_strategies import ValidationConfig
 
 def main():
     """Main function to run data validation."""
-    # Logging is configured by importing sftk.log_config
     logging.info("Error validation started")
 
     # Create validator and configuration

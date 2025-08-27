@@ -577,7 +577,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Logging is configured by importing sftk.log_config
     logging.info("Script started")
     main()
     logging.info("Script completed")

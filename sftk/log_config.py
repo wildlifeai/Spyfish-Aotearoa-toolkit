@@ -37,17 +37,18 @@ def clear_logs_directory() -> None:
 LOG_PATH = _set_logging_path()
 
 # Simple configuration: use file logging if LOG_OUTPUT=file, otherwise console (default)
+format_string = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 if os.getenv("LOG_OUTPUT", "console").lower() == "file":
     logging.basicConfig(
         filename=LOG_PATH,
         level="INFO",
-        format="%(asctime)s - %(levelname)s - %(message)s",
+        format=format_string,
         force=True,
     )
 else:
     # Default to console output
     logging.basicConfig(
         level="INFO",
-        format="%(asctime)s - %(levelname)s - %(message)s",
+        format=format_string,
         force=True,
     )

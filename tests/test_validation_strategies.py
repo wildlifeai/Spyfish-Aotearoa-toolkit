@@ -20,14 +20,19 @@ def test_validation_config_enable_all():
     assert config.unique is True
 
 
-def test_error_message_for_required():
-    """Should build correct message for required validation."""
-    from sftk.validation_strategies import ErrorMessageBuilder, ValidationCheckType
+def test_required_validator_error_message():
+    """RequiredValidator should generate correct error message."""
+    from sftk.validation_strategies import RequiredValidator
 
-    message = ErrorMessageBuilder.build_message(
-        ValidationCheckType.REQUIRED, "name", "help info"
-    )
-    assert "Missing value in required column 'name'" in message
+    validator = RequiredValidator({})
+    rules = {"file_name": "test.csv", "required": ["name"], "info_columns": []}
+    df = pd.DataFrame({"name": ["Alice", None, "Bob"]})
+
+    errors = validator.validate(rules, df)
+
+    assert len(errors) == 1
+    assert "Missing value in required column 'name'" in errors[0].error_info
+    assert "help_info:" in errors[0].error_info
 
 
 def test_required_validator_finds_missing_values():

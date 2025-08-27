@@ -218,7 +218,6 @@ class DataValidator:
             strategy_errors = file_presence_validator.validate(
                 file_presence_rules_wrapper, pd.DataFrame()
             )
-            # FilePresenceValidator already returns ErrorChecking objects
             self.errors.extend(strategy_errors)
         logging.info("File presence validation completed.")
 
