@@ -398,7 +398,7 @@ def compare_and_update_dataframes(
     # Validate DataFrames
     validation_issues = validate_dataframes(kso_df, sharepoint_df, unique_id_column)
     if validation_issues:
-        kso_df = kso_df[~kso_df[unique_id_column].duplicated(keep=False)]
+        kso_df = kso_df[~kso_df[unique_id_column].duplicated(keep=False)].copy()
         sharepoint_df = sharepoint_df[
             ~sharepoint_df[unique_id_column].duplicated(keep=False)
         ].copy()

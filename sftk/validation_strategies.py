@@ -15,10 +15,13 @@ import pandas as pd
 
 
 class CleanRowTracker:
-    """Tracks which rows remain clean (error-free) during validation."""
+    """Tracks which rows remain clean (error-free) during validation.
 
-    # TODO more testing necessary to see if it works as intended
-    # one potential issue is that the index numbers might change
+    Notes:
+        This assumes the datasets are not changed after initialisation.
+        If validator code changes to change the datasets, review
+        implementation of this class.
+    """
 
     def __init__(self):
         """Initialize with empty clean_row_indices dictionary."""
