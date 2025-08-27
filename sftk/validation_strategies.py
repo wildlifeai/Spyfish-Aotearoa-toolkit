@@ -608,44 +608,11 @@ class FilePresenceValidator(ValidationStrategy):
             return errors
 
         csv_filename = file_presence_config.get("csv_filename")
-        csv_column_to_extract = file_presence_config.get("csv_column_to_extract")
-        valid_extensions = file_presence_config.get("valid_extensions", [])
-        path_prefix = file_presence_config.get("path_prefix", "")
-        column_filter = file_presence_config.get("column_filter")
-        column_value = file_presence_config.get("column_value")
-        s3_sharepoint_path = file_presence_config.get("s3_sharepoint_path", "")
-        bucket = file_presence_config.get("bucket")
-
-        if not all([csv_filename, csv_column_to_extract, bucket]):
-            errors.append(
-                self.create_error(
-                    message="File presence validation skipped: missing required configuration",
-                    error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
-                    file_name="file_presence_config",
-                )
-            )
-            return errors
 
         try:
-            # Get file paths from CSV
-            csv_s3_path = f"{s3_sharepoint_path}/{csv_filename}".strip("/")
-            csv_filepaths_all, csv_filepaths_filtered = (
-                self.s3_handler.get_paths_from_csv(
-                    csv_s3_path=csv_s3_path,
-                    csv_column=csv_column_to_extract,
-                    column_filter=column_filter,
-                    column_value=column_value,
-                    s3_bucket=bucket,
-                )
-            )
-
-            # Get file paths from S3
-            s3_video_filepaths = self.s3_handler.get_paths_from_s3(
-                path_prefix=path_prefix, valid_extensions=valid_extensions
-            )
+            missing_files, extra_files = self.get_file_differences(rules)
 
             # Find missing files (in CSV but not in S3)
-            missing_files = csv_filepaths_filtered - s3_video_filepaths
             for file_path in missing_files:
                 if not self._should_continue_collecting_errors(len(errors)):
                     break
@@ -658,7 +625,6 @@ class FilePresenceValidator(ValidationStrategy):
                 )
 
             # Find extra files (in S3 but not in CSV)
-            extra_files = s3_video_filepaths - csv_filepaths_all
             for file_path in extra_files:
                 if not self._should_continue_collecting_errors(len(errors)):
                     break

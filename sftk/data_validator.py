@@ -20,7 +20,7 @@ from sftk.common import (
     VALIDATION_RULES,
 )
 from sftk.s3_handler import S3FileNotFoundError, S3Handler
-from sftk.utils import convert_int_num_columns_to_int
+from sftk.utils import convert_int_num_columns_to_int, write_files_to_txt
 from sftk.validation_strategies import (
     ErrorChecking,
     ErrorSource,
@@ -427,8 +427,6 @@ class DataValidator:
             - Creates two text files with file paths, one per line
             - Logs the operation and number of files found
         """
-        from sftk.utils import write_files_to_txt
-
         try:
             # Get the FilePresenceValidator from the strategy registry
             file_presence_validator = self.strategy_registry.strategies.get(
