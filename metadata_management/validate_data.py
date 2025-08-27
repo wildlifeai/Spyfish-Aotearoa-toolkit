@@ -24,6 +24,8 @@ def main():
     validator = DataValidator()
     config = ValidationConfig()
     config.enable_all()  # Enable all validation types
+    config.file_presence = True
+    config.extract_clean_dataframes = True  # Enable clean dataframe extraction
 
     # Run validation using new interface
     result_df = validator.validate_with_config(config)
@@ -31,9 +33,16 @@ def main():
 
     # Export results
     if EXPORT_LOCAL:
+
         validator.export_to_csv(
             os.path.join(LOCAL_DATA_FOLDER_PATH, "validation_errors.csv")
         )
+        if config.extract_clean_dataframes:
+            # Export clean dataframes using the new method
+            validator.export_clean_dataframes_to_csv(LOCAL_DATA_FOLDER_PATH)
+
+            summary = validator.get_clean_summary()
+            logging.info(summary)
 
         # Export file differences to separate text files
         missing_files_path = os.path.join(
@@ -43,6 +52,7 @@ def main():
             LOCAL_DATA_FOLDER_PATH, "extra_files_in_aws.txt"
         )
         validator.export_file_differences(missing_files_path, extra_files_path)
+
     else:
         validator.upload_to_s3()
     logging.info("Error validation process completed, files created/uploaded.")

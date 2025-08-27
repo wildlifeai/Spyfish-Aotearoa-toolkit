@@ -269,7 +269,10 @@ class S3Handler:
         logging.info(
             f"Unique file paths from CSV, without filtered value {column_filter} as {column_value}: {len(csv_filepaths_without_filtered_values)}."
         )
-        # TODO why it has to be two different entries?
+        # TODO: check if there is a way to do it in one output?
+        # Return two sets: all paths from the CSV, and paths excluding filtered values.
+        # 'all' is used to check for extra files in S3 (a file in S3 is not extra if it's anywhere in the CSV).
+        # 'without_filtered_values' is used to check for missing files (a file is only missing if it's from a valid deployment).
         return csv_filepaths_all, csv_filepaths_without_filtered_values
 
     def get_paths_from_s3(
@@ -285,13 +288,14 @@ class S3Handler:
             bucket=s3_bucket, prefix=path_prefix
         )
 
+        if valid_extensions:
+            s3_filepaths = filter_file_paths_by_extension(
+                s3_filepaths, valid_extensions
+            )
         # Filter only video files based on their extension
-        s3_video_filepaths = set(
-            # TODO does this work if valid extensions is not given? Write test.
-            filter_file_paths_by_extension(s3_filepaths, valid_extensions)
-        )
-        logging.info(f"Video files in S3: {len(s3_video_filepaths)}")
-        return s3_video_filepaths
+        s3_filepaths_set = set(s3_filepaths)
+        logging.info(f"Video files in S3: {len(s3_filepaths_set)}")
+        return s3_filepaths_set
 
     def rename_s3_objects_from_dict(
         self,

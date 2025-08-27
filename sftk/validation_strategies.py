@@ -9,9 +9,53 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
+
+
+class CleanRowTracker:
+    """Tracks which rows remain clean (error-free) during validation."""
+
+    # TODO more testing necessary to see if it works as intended
+    # one potential issue is that the index numbers might change
+
+    def __init__(self):
+        """Initialize with empty clean_row_indices dictionary."""
+        self.clean_row_indices: Dict[str, Set[int]] = {}
+
+    def initialize_dataset(self, dataset_name: str, df: pd.DataFrame) -> None:
+        """
+        Initialize clean indices with all row indices for a dataset.
+
+        Args:
+            dataset_name: Name of the dataset
+            df: DataFrame to initialize indices for
+        """
+        self.clean_row_indices[dataset_name] = set(df.index)
+
+    def mark_row_as_error(self, row_index: int, dataset_name: str) -> None:
+        """
+        Remove a row index from the clean set.
+
+        Args:
+            row_index: Index of the row that has an error
+            dataset_name: Name of the dataset
+        """
+        if dataset_name in self.clean_row_indices:
+            self.clean_row_indices[dataset_name].discard(row_index)
+
+    def get_clean_indices(self, dataset_name: str) -> Set[int]:
+        """
+        Get clean row indices for a dataset.
+
+        Args:
+            dataset_name: Name of the dataset
+
+        Returns:
+            Set of clean row indices, empty set if dataset not found
+        """
+        return self.clean_row_indices.get(dataset_name, set())
 
 
 @dataclass
@@ -49,16 +93,18 @@ class ValidationConfig:
         formats (bool): Enable validation of data format patterns
         column_relationships (bool): Enable validation of column relationships
         file_presence (bool): Enable validation of file presence in S3
+        extract_clean_dataframes (bool): Enable extraction of clean (error-free) dataframes
         max_errors_per_validator (int): Maximum errors per validator to prevent memory issues
     """
 
-    remove_duplicates: bool = True
     required: bool = False
     unique: bool = False
     foreign_keys: bool = False
     formats: bool = False
     column_relationships: bool = False
     file_presence: bool = False
+    remove_duplicates: bool = True
+    extract_clean_dataframes: bool = False
     max_errors_per_validator: int = (
         10000  # Limit errors per validator to prevent memory issues
     )
@@ -86,38 +132,54 @@ class ValidationConfig:
             list: List of field names that represent validation types
 
         Note:
-            Excludes 'remove_duplicates' as it's a configuration option, not a validation type.
+            Excludes 'remove_duplicates' and 'extract_clean_dataframes' as they are
+            configuration options, not validation types.
         """
-        # Get all boolean fields except remove_duplicates and max_errors_per_validator
+        # Get all boolean fields except configuration options
+        excluded_fields = {"remove_duplicates", "extract_clean_dataframes"}
         return [
             field_name
             for field_name, field_type in self.__dataclass_fields__.items()
-            if field_type.type == bool and field_name != "remove_duplicates"
+            if field_type.type == bool and field_name not in excluded_fields
         ]
 
 
 class ValidationStrategy(ABC):
     """Abstract base class for validation strategies."""
 
-    def __init__(self, validation_rules: Dict[str, Any], max_errors: int = 1000):
+    def __init__(
+        self,
+        validation_rules: Dict[str, Any],
+        max_errors: int = 1000,
+        clean_row_tracker=None,
+    ):
         """
         Initialize the validation strategy.
 
         Args:
             validation_rules: Dictionary containing all validation rules and reference datasets
             max_errors: Maximum number of errors to collect per validation run
+            clean_row_tracker: Optional CleanRowTracker instance for tracking clean rows
         """
         self.validation_rules = validation_rules
         self.max_errors = max_errors
+        self.clean_row_tracker = clean_row_tracker
 
     @abstractmethod
-    def validate(self, rules: Dict[str, Any], df: pd.DataFrame) -> List[ErrorChecking]:
+    def validate(
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
+    ) -> List[ErrorChecking]:
         """
         Perform validation on the given DataFrame.
 
         Args:
             rules: Validation rules for the current dataset
             df: DataFrame to validate
+            dataset_name: Name of the dataset being validated (required for most validators,
+                         optional only for FilePresenceValidator)
 
         Returns:
             List of ErrorChecking objects for any validation failures
@@ -231,6 +293,7 @@ class ValidationStrategy(ABC):
         skip_empty_rows: bool = True,
         skip_single_column_empty: bool = False,
         error_source: str = ErrorSource.SHAREPOINT_VALIDATION.value,
+        dataset_name: Optional[str] = None,
         **kwargs,
     ) -> Optional[ErrorChecking]:
         """
@@ -258,6 +321,7 @@ class ValidationStrategy(ABC):
         # Handle empty row logic
         if skip_empty_rows:
             if skip_single_column_empty:
+                # TODO: check if this is necessary
                 # RequiredValidator logic: skip completely empty rows but not rows with just target column missing
                 if row.isna().all() and len(row) > 1:
                     return None
@@ -276,7 +340,7 @@ class ValidationStrategy(ABC):
             col_name=col_name, relevant_column_info=relevant_column_info, **kwargs
         )
 
-        return self.create_error(
+        error = self.create_error(
             message=message,
             error_source=error_source,
             column_name=col_name,
@@ -284,11 +348,22 @@ class ValidationStrategy(ABC):
             file_name=file_name,
         )
 
+        # Mark this row as having an error in the clean row tracker
+        if error and self.clean_row_tracker and dataset_name:
+            self.clean_row_tracker.mark_row_as_error(row.name, dataset_name)
+
+        return error
+
 
 class RequiredValidator(ValidationStrategy):
     """Validator for required column checks."""
 
-    def validate(self, rules: Dict[str, Any], df: pd.DataFrame) -> List[ErrorChecking]:
+    def validate(
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
+    ) -> List[ErrorChecking]:
         """Validate that required columns contain non-null values."""
         errors = []
         file_name = self._extract_file_name(rules)
@@ -317,6 +392,7 @@ class RequiredValidator(ValidationStrategy):
                     check_type="required",
                     message_template="Missing value in required column '{col_name}', help_info: {relevant_column_info}.",
                     skip_single_column_empty=True,
+                    dataset_name=dataset_name,
                 )
                 if error:
                     errors.append(error)
@@ -327,7 +403,12 @@ class RequiredValidator(ValidationStrategy):
 class UniqueValidator(ValidationStrategy):
     """Validator for unique column checks."""
 
-    def validate(self, rules: Dict[str, Any], df: pd.DataFrame) -> List[ErrorChecking]:
+    def validate(
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
+    ) -> List[ErrorChecking]:
         """Validate that columns marked as unique contain no duplicate values."""
         errors = []
         file_name = self._extract_file_name(rules)
@@ -356,6 +437,7 @@ class UniqueValidator(ValidationStrategy):
                     info_columns=info_columns,
                     check_type="duplicate",
                     message_template="Duplicate value in unique column '{col_name}'",
+                    dataset_name=dataset_name,
                 )
                 if error:
                     errors.append(error)
@@ -371,6 +453,7 @@ class FormatValidator(ValidationStrategy):
         validation_rules: Dict[str, Any],
         patterns: Dict[str, str],
         max_errors: int = 1000,
+        clean_row_tracker=None,
     ):
         """
         Initialize the format validator.
@@ -379,11 +462,17 @@ class FormatValidator(ValidationStrategy):
             validation_rules: Dictionary containing all validation rules and datasets
             patterns: Dictionary mapping column names to regex patterns
             max_errors: Maximum number of errors to collect
+            clean_row_tracker: Optional CleanRowTracker instance for tracking clean rows
         """
-        super().__init__(validation_rules, max_errors)
+        super().__init__(validation_rules, max_errors, clean_row_tracker)
         self.patterns = patterns
 
-    def validate(self, rules: Dict[str, Any], df: pd.DataFrame) -> List[ErrorChecking]:
+    def validate(
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
+    ) -> List[ErrorChecking]:
         """Validate data formats against predefined regex patterns."""
         errors = []
         file_name = self._extract_file_name(rules)
@@ -406,6 +495,7 @@ class FormatValidator(ValidationStrategy):
                     message_template="Value {actual_value} does not match required format for {col_name}: expected pattern '{pattern}'",
                     pattern=pattern,
                     actual_value=row[col],
+                    dataset_name=dataset_name,
                 )
                 if error:
                     errors.append(error)
@@ -416,7 +506,12 @@ class FormatValidator(ValidationStrategy):
 class ForeignKeyValidator(ValidationStrategy):
     """Validator for foreign key relationship checks."""
 
-    def validate(self, rules: Dict[str, Any], df: pd.DataFrame) -> List[ErrorChecking]:
+    def validate(
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
+    ) -> List[ErrorChecking]:
         """Validate foreign key relationships between datasets."""
         errors = []
         source_file = self._extract_file_name(rules)
@@ -485,6 +580,7 @@ class ForeignKeyValidator(ValidationStrategy):
                     message_template="Foreign key '{col_name}' = '{actual_value}' not found in '{fk_file_name}'",
                     fk_file_name=fk_file_name,
                     actual_value=row[fk_col],
+                    dataset_name=dataset_name,
                 )
                 if error:
                     errors.append(error)
@@ -495,10 +591,15 @@ class ForeignKeyValidator(ValidationStrategy):
 class RelationshipValidator(ValidationStrategy):
     """Validator for column relationship checks."""
 
-    def validate(self, rules: Dict[str, Any], df: pd.DataFrame) -> List[ErrorChecking]:
+    def validate(
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
+    ) -> List[ErrorChecking]:
         """Validate column relationships across all rows in a dataset."""
         errors = []
-        dataset_name = self._extract_file_name(rules)
+        file_name = self._extract_file_name(rules)
         relationships = rules.get("relationships", [])
 
         for rel in relationships:
@@ -506,7 +607,7 @@ class RelationshipValidator(ValidationStrategy):
 
             if col not in df.columns:
                 errors.append(
-                    self._create_missing_column_error(col, dataset_name, "relationship")
+                    self._create_missing_column_error(col, file_name, "relationship")
                 )
                 continue
 
@@ -571,7 +672,11 @@ class FilePresenceValidator(ValidationStrategy):
     """Validator for file presence checks between CSV references and S3 storage."""
 
     def __init__(
-        self, validation_rules: Dict[str, Any], s3_handler, max_errors: int = 1000
+        self,
+        validation_rules: Dict[str, Any],
+        s3_handler,
+        max_errors: int = 1000,
+        clean_row_tracker=None,
     ):
         """
         Initialize the file presence validator.
@@ -580,15 +685,21 @@ class FilePresenceValidator(ValidationStrategy):
             validation_rules: Dictionary containing all validation rules and reference datasets
             s3_handler: S3Handler instance for S3 operations
             max_errors: Maximum number of errors to collect
+            clean_row_tracker: Optional CleanRowTracker instance for tracking clean rows
         """
-        super().__init__(validation_rules, max_errors)
+        super().__init__(validation_rules, max_errors, clean_row_tracker)
         self.s3_handler = s3_handler
 
     def validate(
-        self, rules: Dict[str, Any], df: pd.DataFrame
+        self,
+        rules: Dict[str, Any],
+        df: pd.DataFrame,
+        dataset_name: Optional[str] = None,
     ) -> List[ErrorChecking]:  # pylint: disable=unused-argument
         """
         Validate file presence between CSV references and S3 storage.
+
+        Note: dataset_name is not used by this validator as it works directly with S3 files.
 
         This method compares video file paths referenced in CSV data with actual
         files available in S3 storage, identifying missing and extra files.
@@ -718,6 +829,7 @@ class ValidationStrategyRegistry:
         patterns: Dict[str, str],
         s3_handler=None,
         max_errors: int = 1000,
+        clean_row_tracker=None,
     ):
         """
         Initialize the registry with validation strategies.
@@ -727,19 +839,28 @@ class ValidationStrategyRegistry:
             patterns: Dictionary mapping column names to regex patterns
             s3_handler: S3Handler instance for file presence validation
             max_errors: Maximum number of errors per validator
+            clean_row_tracker: Optional CleanRowTracker instance for tracking clean rows
         """
         self.strategies = {
-            "required": RequiredValidator(validation_rules, max_errors),
-            "unique": UniqueValidator(validation_rules, max_errors),
-            "formats": FormatValidator(validation_rules, patterns, max_errors),
-            "foreign_keys": ForeignKeyValidator(validation_rules, max_errors),
-            "column_relationships": RelationshipValidator(validation_rules, max_errors),
+            "required": RequiredValidator(
+                validation_rules, max_errors, clean_row_tracker
+            ),
+            "unique": UniqueValidator(validation_rules, max_errors, clean_row_tracker),
+            "formats": FormatValidator(
+                validation_rules, patterns, max_errors, clean_row_tracker
+            ),
+            "foreign_keys": ForeignKeyValidator(
+                validation_rules, max_errors, clean_row_tracker
+            ),
+            "column_relationships": RelationshipValidator(
+                validation_rules, max_errors, clean_row_tracker
+            ),
         }
 
         # Add file presence validator if s3_handler is provided
         if s3_handler:
             self.strategies["file_presence"] = FilePresenceValidator(
-                validation_rules, s3_handler, max_errors
+                validation_rules, s3_handler, max_errors, clean_row_tracker
             )
 
     def get_strategy(self, strategy_name: str) -> Optional[ValidationStrategy]:

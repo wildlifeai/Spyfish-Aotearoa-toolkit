@@ -22,6 +22,7 @@ from sftk.common import (
 from sftk.s3_handler import S3FileNotFoundError, S3Handler
 from sftk.utils import convert_int_num_columns_to_int, write_files_to_txt
 from sftk.validation_strategies import (
+    CleanRowTracker,
     ErrorChecking,
     ErrorSource,
     ValidationConfig,
@@ -64,6 +65,7 @@ class DataValidator:
         self.s3_handler = S3Handler()
         self.bucket = S3_BUCKET
         self.validation_rules = self._get_validation_rules()
+        self.clean_row_tracker = None
         # Initialize with default max_errors, will be updated per validation run
         self.strategy_registry = ValidationStrategyRegistry(
             self.validation_rules, self.patterns, self.s3_handler
@@ -153,9 +155,13 @@ class DataValidator:
             # Convert numerical values to integers where possible
             df = convert_int_num_columns_to_int(df)
 
+            # Initialize clean indices for this dataset if tracker is enabled
+            if self.clean_row_tracker:
+                self.clean_row_tracker.initialize_dataset(dataset_name, df)
+
             # Run validation strategies on the dataset
             self._run_validation_strategies(
-                enabled_strategies, strategy_registry, rules, df
+                enabled_strategies, strategy_registry, rules, df, dataset_name
             )
 
     def _run_validation_strategies(
@@ -164,6 +170,7 @@ class DataValidator:
         strategy_registry: "ValidationStrategyRegistry",
         rules: Dict[str, Any],
         df: pd.DataFrame,
+        dataset_name: str,
     ) -> None:
         """
         Run enabled validation strategies on a dataset.
@@ -180,7 +187,7 @@ class DataValidator:
         for strategy in enabled_strategies:
             # Skip file presence validator for regular datasets
             if strategy != strategy_registry.strategies.get("file_presence"):
-                strategy_errors = strategy.validate(rules, df)
+                strategy_errors = strategy.validate(rules, df, dataset_name)
                 self.errors.extend(strategy_errors)
 
     def _prepare_validation_rules(self, config: ValidationConfig) -> Dict[str, Any]:
@@ -218,12 +225,19 @@ class DataValidator:
         if not config.any_enabled():
             config.enable_all()
 
+        # Initialize clean row tracker if requested
+        if config.extract_clean_dataframes:
+            self.clean_row_tracker = CleanRowTracker()
+        else:
+            self.clean_row_tracker = None
+
         # Set up validation infrastructure
         strategy_registry = ValidationStrategyRegistry(
             self.validation_rules,
             self.patterns,
             self.s3_handler,
             config.max_errors_per_validator,
+            self.clean_row_tracker,
         )
         enabled_strategies = strategy_registry.get_enabled_strategies(config)
 
@@ -383,6 +397,60 @@ class DataValidator:
         self.errors_df.to_csv(csv_file_name, index=False)
         logging.info(f"Errors exported to csv file {csv_file_name}.")
 
+    def export_clean_dataframes_to_csv(self, output_directory: str) -> None:
+        """
+        Export all clean dataframes to CSV files.
+
+        Exports each clean dataframe (rows with no validation errors) to separate
+        CSV files in the specified directory. Files are named with the pattern
+        "clean_{dataset_name}.csv".
+
+        Args:
+            output_directory (str): Directory path where CSV files will be saved.
+                The directory must exist.
+
+        Side Effects:
+            - Creates CSV files for each clean dataframe in the output directory
+            - Logs the export operation for each dataset
+
+        Raises:
+            ValueError: If no clean dataframes are available (clean row tracking not enabled)
+            OSError: If the output directory doesn't exist or isn't writable
+
+        Note:
+            - Only available when extract_clean_dataframes was enabled in ValidationConfig
+            - CSV files are exported without DataFrame index
+            - Empty dataframes are skipped
+        """
+        import os
+
+        if not self.clean_row_tracker:
+            raise ValueError(
+                "Clean dataframes not available. Enable extract_clean_dataframes "
+                "in ValidationConfig before running validation."
+            )
+
+        clean_dataframes = self.get_all_clean_dataframes()
+        if not clean_dataframes:
+            logging.info("No clean dataframes to export.")
+            return
+
+        if not os.path.exists(output_directory):
+            raise OSError(f"Output directory does not exist: {output_directory}")
+
+        for dataset_name, clean_df in clean_dataframes.items():
+            if clean_df.empty:
+                logging.info(f"Skipping empty clean dataframe for {dataset_name}")
+                continue
+
+            output_path = os.path.join(output_directory, f"clean_{dataset_name}.csv")
+            clean_df.to_csv(output_path, index=False)
+            logging.info(f"Clean {dataset_name} dataframe exported to {output_path}")
+
+        logging.info(
+            f"Exported {len(clean_dataframes)} clean dataframes to {output_directory}"
+        )
+
     def upload_to_s3(self):
         """
         Upload validation errors DataFrame to S3 storage.
@@ -454,3 +522,91 @@ class DataValidator:
         except Exception as e:
             logging.error(f"Failed to export file differences: {e}")
             raise
+
+    def get_clean_dataframe(self, dataset_name: str) -> pd.DataFrame:
+        """
+        Get clean dataframe for a specific dataset.
+
+        Args:
+            dataset_name: Name of the dataset to get clean rows for
+
+        Returns:
+            DataFrame containing only rows with no validation errors,
+            empty DataFrame if no tracker or dataset not found
+        """
+        if not self.clean_row_tracker:
+            return pd.DataFrame()
+
+        clean_indices = self.clean_row_tracker.get_clean_indices(dataset_name)
+        if not clean_indices:
+            return pd.DataFrame()
+
+        # Get the original dataset from validation rules
+        dataset_rules = self.validation_rules.get(dataset_name)
+        if not dataset_rules or "dataset" not in dataset_rules:
+            return pd.DataFrame()
+
+        original_df = dataset_rules["dataset"]
+        if original_df.empty:
+            return pd.DataFrame()
+
+        # Filter to clean rows only
+        return original_df.loc[list(clean_indices)].copy()
+
+    def get_all_clean_dataframes(self) -> Dict[str, pd.DataFrame]:
+        """
+        Get all clean dataframes.
+
+        Returns:
+            Dictionary mapping dataset names to clean DataFrames,
+            empty dict if no tracker is initialized
+        """
+        if not self.clean_row_tracker:
+            return {}
+
+        clean_dataframes = {}
+        for dataset_name in self.clean_row_tracker.clean_row_indices.keys():
+            clean_df = self.get_clean_dataframe(dataset_name)
+            if not clean_df.empty:
+                clean_dataframes[dataset_name] = clean_df
+
+        return clean_dataframes
+
+    def get_clean_summary(self) -> Dict[str, Any]:
+        """
+        Get summary of clean vs error rows.
+
+        Returns:
+            Dictionary with summary statistics for all datasets
+        """
+        if not self.clean_row_tracker:
+            return {
+                "message": "Clean dataframe extraction was not enabled during validation",
+                "datasets": {},
+            }
+
+        summary = {"datasets": {}}
+
+        for dataset_name in self.clean_row_tracker.clean_row_indices.keys():
+            dataset_rules = self.validation_rules.get(dataset_name)
+            if dataset_rules and "dataset" in dataset_rules:
+                original_df = dataset_rules["dataset"]
+                clean_indices = self.clean_row_tracker.get_clean_indices(dataset_name)
+
+                total_rows = len(original_df)
+                clean_rows = len(clean_indices)
+                error_rows = total_rows - clean_rows
+
+                summary["datasets"][dataset_name] = {
+                    "total_rows": total_rows,
+                    "clean_rows": clean_rows,
+                    "error_rows": error_rows,
+                    "clean_percentage": (
+                        (clean_rows / total_rows * 100) if total_rows > 0 else 0
+                    ),
+                    "error_percentage": (
+                        (error_rows / total_rows * 100) if total_rows > 0 else 0
+                    ),
+                }
+
+        return summary
