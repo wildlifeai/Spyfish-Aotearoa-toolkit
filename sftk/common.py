@@ -103,19 +103,6 @@ MOVIE_EXTENSIONS = [
     "wmv",
 ]
 
-# TODO add documentation
-VIDEOS_IN_SHAREPOINT_INFO = {
-    "csv_filename": "BUV Deployment.csv",
-    "info_column": "LinkToVideoFile",
-    "column_filter": "IsBadDeployment",
-    "column_value": False,
-}
-
-VIDEOS_IN_AWS_INFO = {
-    "path_prefix": "media",
-    "valid_movie_extensions": MOVIE_EXTENSIONS,
-}
-
 VALIDATION_RULES = {
     "deployments": {
         "file_name": S3_SHAREPOINT_DEPLOYMENT_CSV,
@@ -188,6 +175,22 @@ VALIDATION_RULES = {
         "relationships": [],
     },
 }
+
+# File presence validation rules configuration
+# Dictionary containing configuration for validating file presence in S3 against CSV references
+FILE_PRESENCE_RULES = {
+    "file_presence": {
+        "bucket": S3_BUCKET,
+        "s3_sharepoint_path": S3_SHAREPOINT_PATH,
+        "csv_filename": "BUV Deployment.csv",
+        "csv_column_to_extract": "LinkToVideoFile",
+        "column_filter": "IsBadDeployment",
+        "column_value": False,
+        "valid_extensions": MOVIE_EXTENSIONS,
+        "path_prefix": "media",
+    }
+}
+
 
 VALIDATION_PATTERNS = {
     "DropID": r"^[A-Z]{3}_\d{8}_BUV_[A-Z]{3}_\d{3}_\d{2}$",

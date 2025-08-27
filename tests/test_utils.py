@@ -15,6 +15,7 @@ from sftk.utils import (
     is_format_match,
     read_file_to_df,
     temp_file_manager,
+    write_files_to_txt,
 )
 
 survey_pattern = r"^[A-Z]{3}_\d{8}_BUV$"
@@ -205,3 +206,51 @@ def test_temp_file_manager_with_exception():
 
     # File should still be deleted despite the exception
     assert not os.path.exists(temp_file)
+
+
+def test_write_files_to_txt():
+    """Test writing file paths to text file."""
+
+    file_set = {"path/to/file1.mp4", "path/to/file2.mp4", "another/file3.mp4"}
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as tmp:
+        output_path = tmp.name
+
+    try:
+        write_files_to_txt(file_set, output_path)
+
+        # Read the file back and verify contents
+        with open(output_path, "r", encoding="utf-8") as f:
+            lines = f.read().strip().split("\n")
+
+        # Should be sorted and contain all files
+        expected_lines = sorted(file_set)
+        assert lines == expected_lines
+
+    finally:
+        # Clean up
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
+def test_write_files_to_txt_empty_set():
+    """Test writing empty file set to text file."""
+
+    file_set = set()
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as tmp:
+        output_path = tmp.name
+
+    try:
+        write_files_to_txt(file_set, output_path)
+
+        # Read the file back and verify it's empty
+        with open(output_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        assert content == ""
+
+    finally:
+        # Clean up
+        if os.path.exists(output_path):
+            os.remove(output_path)

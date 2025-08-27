@@ -211,6 +211,68 @@ def test_file_presence_validator():
     )
 
 
+def test_file_presence_validator_get_file_differences():
+    """FilePresenceValidator.get_file_differences should return missing and extra files as separate sets."""
+    from unittest.mock import Mock
+
+    from sftk.validation_strategies import FilePresenceValidator
+
+    # Mock S3Handler
+    mock_s3_handler = Mock()
+    mock_s3_handler.get_paths_from_csv.return_value = (
+        {"file1.mp4", "file2.mp4", "file3.mp4"},  # all files
+        {"file1.mp4", "file2.mp4"},  # filtered files
+    )
+    mock_s3_handler.get_paths_from_s3.return_value = {
+        "file1.mp4",
+        "file4.mp4",
+    }  # S3 files
+
+    validator = FilePresenceValidator({}, mock_s3_handler)
+    rules = {
+        "file_presence": {
+            "csv_filename": "test.csv",
+            "csv_column_to_extract": "video_path",
+            "valid_extensions": ["mp4"],
+            "path_prefix": "videos/",
+            "s3_sharepoint_path": "sharepoint",
+            "bucket": "test-bucket",
+        }
+    }
+
+    missing_files, extra_files = validator.get_file_differences(rules)
+
+    # Should find 1 missing file (file2.mp4 in filtered CSV but not in S3)
+    assert missing_files == {"file2.mp4"}
+
+    # Should find 1 extra file (file4.mp4 in S3 but not in all CSV files)
+    assert extra_files == {"file4.mp4"}
+
+
+def test_file_presence_validator_get_file_differences_missing_config():
+    """FilePresenceValidator.get_file_differences should raise ValueError for missing config."""
+    from unittest.mock import Mock
+
+    from sftk.validation_strategies import FilePresenceValidator
+
+    mock_s3_handler = Mock()
+    validator = FilePresenceValidator({}, mock_s3_handler)
+
+    # Test with missing required configuration
+    rules = {
+        "file_presence": {
+            "csv_filename": "test.csv",
+            # Missing csv_column_to_extract and bucket
+        }
+    }
+
+    try:
+        validator.get_file_differences(rules)
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "requires csv_filename, csv_column_to_extract, and bucket" in str(e)
+
+
 def test_strategy_registry_mapping():
     """Test that strategy registry correctly maps config flags to strategies."""
     from sftk.validation_strategies import ValidationConfig, ValidationStrategyRegistry

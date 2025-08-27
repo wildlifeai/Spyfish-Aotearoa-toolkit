@@ -34,6 +34,15 @@ def main():
         validator.export_to_csv(
             os.path.join(LOCAL_DATA_FOLDER_PATH, "validation_errors.csv")
         )
+
+        # Export file differences to separate text files
+        missing_files_path = os.path.join(
+            LOCAL_DATA_FOLDER_PATH, "missing_files_in_aws.txt"
+        )
+        extra_files_path = os.path.join(
+            LOCAL_DATA_FOLDER_PATH, "extra_files_in_aws.txt"
+        )
+        validator.export_file_differences(missing_files_path, extra_files_path)
     else:
         validator.upload_to_s3()
     logging.info("Error validation process completed, files created/uploaded.")

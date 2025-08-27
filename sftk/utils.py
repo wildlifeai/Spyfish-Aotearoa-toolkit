@@ -187,6 +187,28 @@ def convert_int_num_columns_to_int(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def write_files_to_txt(file_set: set[str], output_path: str) -> None:
+    """
+    Write a set of file paths to a text file, one path per line.
+
+    Args:
+        file_set: Set of file paths to write
+        output_path: Path to the output text file
+
+    Side Effects:
+        - Creates or overwrites the file at output_path
+        - Logs the operation
+    """
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            for file_path in sorted(file_set):
+                f.write(f"{file_path}\n")
+        logging.info(f"Wrote {len(file_set)} file paths to {output_path}")
+    except (IOError, OSError) as e:
+        logging.error(f"Failed to write file paths to {output_path}: {e}")
+        raise
+
+
 @contextmanager
 def temp_file_manager(filenames: list[str]):
     """Context manager to handle temporary file cleanup."""
