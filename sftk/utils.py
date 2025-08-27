@@ -2,10 +2,26 @@ import logging
 import os
 import re
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, cast
 
 import numpy as np
 import pandas as pd
+
+
+def normalize_file_name(file_name: Any) -> str:
+    """
+    Normalize file name by extracting just the filename from a path.
+
+    Args:
+        file_name: File name or path (str, Path, or other)
+
+    Returns:
+        str: Just the filename portion, or original value if not a path
+    """
+    if isinstance(file_name, (str, Path)):
+        return Path(file_name).name
+    return file_name
 
 
 def flatten_list(lst: list[list]) -> list:

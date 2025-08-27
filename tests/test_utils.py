@@ -13,6 +13,7 @@ from sftk.utils import (
     get_env_var,
     get_unique_entries_df_column,
     is_format_match,
+    normalize_file_name,
     read_file_to_df,
     temp_file_manager,
     write_files_to_txt,
@@ -254,3 +255,25 @@ def test_write_files_to_txt_empty_set():
         # Clean up
         if os.path.exists(output_path):
             os.remove(output_path)
+
+
+def test_normalize_file_name():
+    """Test normalize_file_name function with various inputs."""
+    from pathlib import Path
+
+    # Test with string path
+    assert normalize_file_name("/path/to/file.csv") == "file.csv"
+    assert normalize_file_name("path/to/file.csv") == "file.csv"
+    assert normalize_file_name("file.csv") == "file.csv"
+
+    # Test with Path object
+    assert normalize_file_name(Path("/path/to/file.csv")) == "file.csv"
+    assert normalize_file_name(Path("file.csv")) == "file.csv"
+
+    # Test with non-path values (should return as-is)
+    assert normalize_file_name(123) == 123
+    assert normalize_file_name(None) is None
+    assert normalize_file_name([]) == []
+
+    # Test with empty string
+    assert normalize_file_name("") == ""

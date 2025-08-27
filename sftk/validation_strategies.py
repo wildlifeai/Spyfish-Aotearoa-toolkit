@@ -5,13 +5,15 @@ This module contains the abstract base class and concrete implementations
 for different types of data validation strategies.
 """
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
+
+from sftk.utils import normalize_file_name
 
 
 class CleanRowTracker:
@@ -195,7 +197,7 @@ class ValidationStrategy(ABC):
 
     def _extract_file_name(self, rules: Dict[str, Any]) -> str:
         """Extract file name from rules dictionary."""
-        return Path(rules.get("file_name", "")).name
+        return normalize_file_name(rules.get("file_name", ""))
 
     def create_error(
         self,
@@ -221,9 +223,7 @@ class ValidationStrategy(ABC):
         Returns:
             ErrorChecking object with the provided details
         """
-        # Process file name the same way as DataValidator.create_error
-        if isinstance(file_name, (str, Path)):
-            file_name = Path(file_name).name
+        file_name = normalize_file_name(file_name)
 
         return ErrorChecking(
             column_name=column_name,
@@ -569,7 +569,7 @@ class ForeignKeyValidator(ValidationStrategy):
                 continue
 
             missing = df[~df[fk_col].isin(target_df[fk_col])]
-            fk_file_name = Path(target_rules["file_name"]).name
+            fk_file_name = normalize_file_name(target_rules["file_name"])
 
             for row_tuple in missing.itertuples():
                 row = self._convert_row_tuple_to_series(row_tuple)
@@ -800,7 +800,7 @@ class FilePresenceValidator(ValidationStrategy):
             )
 
         # Get file paths from CSV
-        csv_s3_path = f"{s3_sharepoint_path}/{csv_filename}".strip("/")
+        csv_s3_path = os.path.join(s3_sharepoint_path, csv_filename)
         csv_paths_result = self.s3_handler.get_paths_from_csv(
             csv_s3_path=csv_s3_path,
             csv_column=csv_column_to_extract,

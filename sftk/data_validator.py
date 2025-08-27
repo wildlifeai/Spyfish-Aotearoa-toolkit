@@ -8,7 +8,6 @@ data validation using various validation strategies.
 import copy
 import logging
 import os
-from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
@@ -21,7 +20,11 @@ from sftk.common import (
     VALIDATION_RULES,
 )
 from sftk.s3_handler import S3FileNotFoundError, S3Handler
-from sftk.utils import convert_int_num_columns_to_int, write_files_to_txt
+from sftk.utils import (
+    convert_int_num_columns_to_int,
+    normalize_file_name,
+    write_files_to_txt,
+)
 from sftk.validation_strategies import (
     CleanRowTracker,
     ErrorChecking,
@@ -141,7 +144,7 @@ class DataValidator:
                     self._validate_file_presence(rules, strategy_registry)
                 continue
 
-            file_name = Path(rules.get("file_name", "")).name
+            file_name = normalize_file_name(rules.get("file_name", ""))
             df = rules.get("dataset", pd.DataFrame())
 
             if df.empty:
@@ -314,8 +317,7 @@ class DataValidator:
         Returns:
             ErrorChecking object with the provided details
         """
-        if isinstance(file_name, (str, Path)):
-            file_name = Path(file_name).name
+        file_name = normalize_file_name(file_name)
 
         return ErrorChecking(
             column_name=column_name,
