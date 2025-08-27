@@ -247,7 +247,8 @@ class S3Handler:
         column_filter: Optional[str] = None,
         column_value: Optional[Any] = None,
         s3_bucket: str = S3_BUCKET,
-    ) -> pd.DataFrame:
+    ) -> tuple[set, set]:
+        # TODO add documentation
 
         logging.info(f"Processing CSV: {csv_s3_path}.")
 
