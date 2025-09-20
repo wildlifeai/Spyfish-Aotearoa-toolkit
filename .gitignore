@@ -11,3 +11,5 @@ spyfish_analysis/
 .python-version
 .DS_Store
 .vscode/
+.venv
+.idea
