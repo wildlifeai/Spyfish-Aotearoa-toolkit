@@ -49,7 +49,8 @@ def process_biigle_annotations(df: pd.DataFrame) -> pd.DataFrame:
 def main():
     """Main function to read, process, and save Biigle annotation data."""
     repo_root = Path(__file__).resolve().parents[1]
-    biigle_file_path = repo_root / "data/25516-ton-20221205-buv-ton-044-01.csv"
+    biigle_file_name = "25516-ton-20221205-buv-ton-044-01.csv"  # change name accordingly
+    biigle_file_path = repo_root / "data" / biigle_file_name
 
     biigle_df = read_file_to_df(str(biigle_file_path))
 
