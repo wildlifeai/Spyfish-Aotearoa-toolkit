@@ -56,7 +56,6 @@ def main():
     if not biigle_df.empty:
         processed_df = process_biigle_annotations(biigle_df)
 
-        # Define output path
         output_filename = f"{biigle_file_path.stem}_parsed.csv"
         output_path = biigle_file_path.with_name(output_filename)
 
