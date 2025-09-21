@@ -1,7 +1,14 @@
+import logging
 from pathlib import Path
-from sftk.utils import read_file_to_df
 import pandas as pd
 import time
+
+from sftk.utils import read_file_to_df
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 def process_biigle_annotations(df: pd.DataFrame) -> pd.DataFrame:
@@ -15,10 +22,13 @@ def process_biigle_annotations(df: pd.DataFrame) -> pd.DataFrame:
 
     # 3. Calculate TimeOfMax
     # Extract start seconds from filename (e.g., ..._clip_115_30... -> 115)
-    grouped_df['start_seconds'] = grouped_df['video_filename'].str.split('_clip_').str[1].str.split('_').str[0].astype(
-        int)
+    grouped_df['start_seconds'] = pd.to_numeric(grouped_df['video_filename'].str.extract(r'_clip_(\d+)_', expand=False),
+                                                errors='coerce')
+    grouped_df.dropna(subset=['start_seconds'], inplace=True)
+    grouped_df['start_seconds'] = grouped_df['start_seconds'].astype(int)
     # Extract frame seconds from the '[seconds]' string
-    grouped_df['frame_seconds'] = grouped_df['frames'].str.strip('[]').astype(float)
+    grouped_df['frame_seconds'] = pd.to_numeric(grouped_df['frames'].str.strip('[]'), errors='coerce')
+    grouped_df.dropna(subset=['frame_seconds'], inplace=True)
     # Calculate total seconds and format to HH:MM:SS
     total_seconds = grouped_df['start_seconds'] + grouped_df['frame_seconds']
     grouped_df['TimeOfMax'] = total_seconds.apply(lambda x: time.strftime('%H:%M:%S', time.gmtime(x)))
@@ -31,7 +41,7 @@ def process_biigle_annotations(df: pd.DataFrame) -> pd.DataFrame:
     })
 
     # Trim DropID to exclude .mp4 and subsequent parts
-    renamed_df['DropID'] = renamed_df['DropID'].str.split('.mp4').str[0]
+    renamed_df['DropID'] = renamed_df['DropID'].str.replace(r'\.mp4.*', '', regex=True)
 
     # 5. Add constant columns (may change according to video)
     renamed_df['AnnotatedBy'] = 'expert'
@@ -62,9 +72,9 @@ def main():
 
         # Save the processed dataframe to a new csv file
         processed_df.to_csv(output_path, index=False)
-        print(f"Processed file saved successfully to: {output_path}")
+        logging.info(f"Processed file saved successfully to: {output_path}")
     else:
-        print(f"DataFrame is empty. Please check the file path: {biigle_file_path}")
+        logging.info(f"DataFrame is empty. Please check the file path: {biigle_file_path}")
 
 
 if __name__ == "__main__":
