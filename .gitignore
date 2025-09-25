@@ -2,6 +2,8 @@
 .env
 data/
 notebooks/wip/
+build/
+
 # old repo, to merge relevant files with the new one
 spyfish_analysis/
 
@@ -11,3 +13,8 @@ spyfish_analysis/
 .python-version
 .DS_Store
 .vscode/
+.venv
+.idea
+
+# adding uv.lock file because it is not yet adopted by repo owners/contributors
+uv.lock
