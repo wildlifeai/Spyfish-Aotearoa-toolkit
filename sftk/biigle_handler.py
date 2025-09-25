@@ -158,6 +158,8 @@ class BiigleHandler:
         """
         Create a label tree and populate it with scientific names from a CSV file.
 
+        TODO: add aphiaID to label tree. It doesn't seem to pick up the info.
+
         Args:
             project_id: The ID of the project to create the label tree in.
             csv_path: Path to CSV file containing label data (name, color, source_id columns).
@@ -187,12 +189,8 @@ class BiigleHandler:
             # Read labels from CSV and add them to the tree
             labels_df = pd.read_csv(csv_path)
             created_labels = {}
-            count = 0
 
             for idx, row in labels_df.iterrows():
-                count += 1
-                if count == 5:
-                    break
                 label_config = {
                     "name": row["name"],
                     "color": row["color"],
@@ -275,8 +273,6 @@ class BiigleHandler:
                 raise FileNotFoundError(f"No CSV files found in {export_path}")
 
             if len(csv_files) > 1:
-                print(csv_files)
-                print(type(csv_files))
                 logging.warning(
                     f"Multiple CSV files found. These are the file names: {csv_files}"
                 )

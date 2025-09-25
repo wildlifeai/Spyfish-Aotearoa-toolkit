@@ -8,6 +8,8 @@ import pandas as pd
 from sftk.biigle_handler import BiigleHandler
 from sftk.common import BIIGLE_API_EMAIL, BIIGLE_API_TOKEN, LOCAL_DATA_FOLDER_PATH
 
+SCALE_BAR_LENGTH_CM = 10
+
 
 class BiigleParser:
     """Handler for BIIGLE API operations."""
@@ -40,6 +42,7 @@ class BiigleParser:
             "frames",
         ]
 
+        # Currently each report is only one video, so this works. To change if that changes.
         self.current_drop_id = re.sub(
             r"\.mp4.*", "", annotations_df["video_filename"].iloc[0]
         )
@@ -83,8 +86,7 @@ class BiigleParser:
 
     def process_max_count(self, annotations_df: pd.DataFrame) -> pd.DataFrame:
         """
-        From the processed 30s counts, select the row with the maximum count
-        per (video_filename, label_name).
+        From the whole video, select the row with the maximum count per (label_name).
 
         If there are ties, pick the earliest time.
         """
@@ -104,8 +106,6 @@ class BiigleParser:
             return pd.DataFrame()
 
         sizes_df = annotations_df[annotations_df["shape_name"] == "LineString"].copy()
-        # Drop scale bar:
-        sizes_df = sizes_df[sizes_df["label_name"] != "___scale bar"]
 
         sizes_df["size_px"] = sizes_df["points"].apply(self.get_size)
 
@@ -113,7 +113,10 @@ class BiigleParser:
         scale_size = sizes_df[sizes_df["label_name"] == "___scale bar"][
             "size_px"
         ].mean()
-        sizes_df["size_cm"] = sizes_df["size_px"] * 10 / scale_size
+        sizes_df["size_cm"] = sizes_df["size_px"] * SCALE_BAR_LENGTH_CM / scale_size
+
+        # Drop scale bar:
+        sizes_df = sizes_df[sizes_df["label_name"] != "___scale bar"]
 
         return sizes_df[
             [
@@ -158,7 +161,7 @@ class BiigleParser:
         total_seconds = (
             annotations_df["start_seconds"] + annotations_df["frame_seconds"]
         )
-        # Keeps milliseconds
+
         annotations_df["time_of_max"] = pd.to_datetime(
             total_seconds, unit="s"
         ).dt.strftime("%H:%M:%S")

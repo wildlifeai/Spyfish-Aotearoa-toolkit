@@ -48,8 +48,9 @@ dev = [
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
-[tool.setuptools]
-packages = ["sftk"]
+
+[tool.setuptools.packages.find]
+include = ["sftk*"]
 
 [tool.isort]
 profile = "black"
