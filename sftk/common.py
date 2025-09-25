@@ -43,9 +43,18 @@ EMAIL_ARCHIVE_FOLDER_CANDIDATES = [
 EMAIL_ARCHIVE_FOLDER = "[Gmail]/All Mail"
 
 
-# Biigle credentials
+# Biigle credentials and configuration
 BIIGLE_API_EMAIL = os.getenv("BIIGLE_API_EMAIL")
-BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")  # api token get from ui
+BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")
+BIIGLE_PROJECT_ID = int(
+    os.getenv("BIIGLE_PROJECT_ID", "3711")
+)  # Spyfish Aotearoa project
+BIIGLE_DISK_ID = int(os.getenv("BIIGLE_DISK_ID", "134"))  # S3 bucket reference
+
+# BIIGLE report type IDs
+BIIGLE_ANNOTATION_REPORT_TYPE = 8
+BIIGLE_VOLUME_REPORT_TYPE = 10
+
 
 # S3 configuration.
 # TODO check ways to set variables, if there are issues reading the .env file
