@@ -225,6 +225,10 @@ def write_files_to_txt(file_set: set[str], output_path: str) -> None:
         raise
 
 
+def ping():
+    logging.info("The Spyfish Aotearoa Toolkit is installed")
+
+
 @contextmanager
 def temp_file_manager(filenames: list[str]):
     """Context manager to handle temporary file cleanup."""

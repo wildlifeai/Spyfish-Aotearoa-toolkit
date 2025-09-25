@@ -45,19 +45,15 @@ EMAIL_ARCHIVE_FOLDER = "[Gmail]/All Mail"
 
 # Biigle credentials and configuration
 BIIGLE_API_EMAIL = os.getenv("BIIGLE_API_EMAIL")
-BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")  # api token get from ui
+BIIGLE_API_TOKEN = os.getenv("BIIGLE_API_TOKEN")
 BIIGLE_PROJECT_ID = int(
     os.getenv("BIIGLE_PROJECT_ID", "3711")
-)  # spyfish aotearoa project
-BIIGLE_DISK_ID = int(os.getenv("BIIGLE_DISK_ID", "98"))  # S3 bucket reference
+)  # Spyfish Aotearoa project
+BIIGLE_DISK_ID = int(os.getenv("BIIGLE_DISK_ID", "134"))  # S3 bucket reference
 
 # BIIGLE report type IDs
 BIIGLE_ANNOTATION_REPORT_TYPE = 8
 BIIGLE_VOLUME_REPORT_TYPE = 10
-
-# BIIGLE label tree configuration
-# 1 is public, 2/0 is public?
-BIIGLE_LABEL_TREE_VISIBILITY_PUBLIC = 0
 
 
 # S3 configuration.
