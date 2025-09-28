@@ -86,9 +86,12 @@ if submitted:
                     f"annotations_{drop_id}_max_n_30s.csv",
                 )
             with tab3:
-                _render_df_section(
-                    sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
-                )
+                if sizes_df.empty:
+                    st.info("No size annotations available.")
+                else:
+                    _render_df_section(
+                        sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
+                    )
         except Exception as e:
             st.error(f"An error occurred while fetching annotations: {e}")
             st.stop()
