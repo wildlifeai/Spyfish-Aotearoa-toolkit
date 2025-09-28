@@ -41,50 +41,54 @@ if submitted:
         st.error("Please provide Email, Token, and a numeric Volume ID.")
 
     else:
-        with st.spinner("Creating report and downloading ZIP…"):
-            biigle_parser = BiigleParser(email=email, token=token)
-            processed = biigle_parser.process_video_annotations(
-                volume_id=int(volume_id_str)
-            )
-
-        # Extract dataframes
-        drop_id = processed.get("drop_id")
-        max_n_30s_df = processed.get("max_n_30s_df")
-        max_n_df = processed.get("max_n_df")
-        sizes_df = processed.get("sizes_df")
-
-        def _render_df_section(df: pd.DataFrame | None, label: str, fname: str):
-            st.subheader(label)
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                st.caption(f"{len(df)} rows")
-                st.dataframe(df, width="stretch")
-                st.download_button(
-                    label=f"Download {label} (CSV)",
-                    data=df.to_csv(index=False).encode("utf-8"),
-                    file_name=fname,
-                    mime="text/csv",
-                    width="stretch",
+        try:
+            with st.spinner("Creating report and downloading ZIP…"):
+                biigle_parser = BiigleParser(email=email, token=token)
+                processed = biigle_parser.process_video_annotations(
+                    volume_id=int(volume_id_str)
                 )
-            else:
-                st.info(f"No data available for **{label}**.")
 
-        st.success(f"Loaded annotations for {drop_id}")
+            # Extract dataframes
+            drop_id = processed.get("drop_id")
+            max_n_30s_df = processed.get("max_n_30s_df")
+            max_n_df = processed.get("max_n_df")
+            sizes_df = processed.get("sizes_df")
 
-        # TODO add some graphs here
-        tab1, tab2, tab3 = st.tabs(
-            ["Max N (whole video)", "Max N (every 30s)", "Size annotations"]
-        )
-        with tab1:
-            _render_df_section(
-                max_n_df, "Max N of whole video", f"annotations_{drop_id}_max_n.csv"
+            def _render_df_section(df: pd.DataFrame | None, label: str, fname: str):
+                st.subheader(label)
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    st.caption(f"{len(df)} rows")
+                    st.dataframe(df, width="stretch")
+                    st.download_button(
+                        label=f"Download {label} (CSV)",
+                        data=df.to_csv(index=False).encode("utf-8"),
+                        file_name=fname,
+                        mime="text/csv",
+                        width="stretch",
+                    )
+                else:
+                    st.info(f"No data available for **{label}**.")
+
+            st.success(f"Loaded annotations for {drop_id}")
+
+            # TODO add some graphs here
+            tab1, tab2, tab3 = st.tabs(
+                ["Max N (whole video)", "Max N (every 30s)", "Size annotations"]
             )
-        with tab2:
-            _render_df_section(
-                max_n_30s_df,
-                "Max N every 30 seconds",
-                f"annotations_{drop_id}_max_n_30s.csv",
-            )
-        with tab3:
-            _render_df_section(
-                sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
-            )
+            with tab1:
+                _render_df_section(
+                    max_n_df, "Max N of whole video", f"annotations_{drop_id}_max_n.csv"
+                )
+            with tab2:
+                _render_df_section(
+                    max_n_30s_df,
+                    "Max N every 30 seconds",
+                    f"annotations_{drop_id}_max_n_30s.csv",
+                )
+            with tab3:
+                _render_df_section(
+                    sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
+                )
+        except Exception as e:
+            st.error(f"An error occurred while fetching annotations: {e}")
+            st.stop()
