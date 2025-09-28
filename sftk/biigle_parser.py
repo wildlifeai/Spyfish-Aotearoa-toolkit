@@ -6,7 +6,7 @@ from typing import Optional
 import pandas as pd
 
 from sftk.biigle_handler import BiigleHandler
-from sftk.common import BIIGLE_API_EMAIL, BIIGLE_API_TOKEN, LOCAL_DATA_FOLDER_PATH
+from sftk.common import BIIGLE_API_EMAIL, BIIGLE_API_TOKEN
 
 SCALE_BAR_LENGTH_CM = 10
 
@@ -20,17 +20,16 @@ class BiigleParser:
         token: Optional[str] = BIIGLE_API_TOKEN,
     ):
         self.biigle_handler = BiigleHandler(email=email, token=token)
-        self.current_drop_id = None
 
     def process_video_annotations(
         self,
         volume_id: int,
-        #  TODO make this a temp file
-        extract_dir: str = LOCAL_DATA_FOLDER_PATH,
-    ):
-        annotations_df = self.biigle_handler.export_annotations(
-            volume_id=volume_id, extract_dir=extract_dir
-        )
+    ) -> dict[str, pd.DataFrame | str]:
+        annotations_df = self.biigle_handler.fetch_annotations_df(volume_id=volume_id)
+
+        if annotations_df.empty:
+            logging.info(f"No data found, seems like volume {volume_id} is empty. ")
+            return {}
 
         required_columns = [
             "label_name",
@@ -42,23 +41,34 @@ class BiigleParser:
             "frames",
         ]
 
-        # Currently each report is only one video, so this works. To change if that changes.
-        self.current_drop_id = re.sub(
-            r"\.mp4.*", "", annotations_df["video_filename"].iloc[0]
-        )
         annotations_df = annotations_df[required_columns]
-        annotations_df = self.extract_seconds(annotations_df)
+
+        drop_id = re.sub(r"\.mp4.*", "", annotations_df["video_filename"].iloc[0])
+        annotations_df["DropID"] = drop_id
+
+        annotations_df = self.extract_time_values(annotations_df)
+
+        # TODO check sorting and time, not doing it for every single df...
+        # sort df based on time:
+        annotations_df = annotations_df.sort_values(
+            by=["video_filename", "start_seconds", "frame_seconds"],
+            ascending=[True, True, True],
+        ).reset_index(drop=True)
+
         max_n_30s_df = self.process_30s_count(annotations_df)
         max_n_df = self.process_max_count(max_n_30s_df)
         sizes_df = self.process_sizes(annotations_df)
+
         processed_dfs = {
+            "drop_id": drop_id,
             "max_n_30s_df": max_n_30s_df,
             "max_n_df": max_n_df,
             "sizes_df": sizes_df,
         }
         logging.info(
-            f"Processed annotations for volume {volume_id} with DropID {self.current_drop_id}"
+            f"Processed annotations for volume {volume_id} with DropID {drop_id}"
         )
+
         return processed_dfs
 
     def process_30s_count(self, annotations_df: pd.DataFrame) -> pd.DataFrame:
@@ -82,6 +92,10 @@ class BiigleParser:
             .reset_index(name="max_count")
         )
 
+        grouped_df = grouped_df.sort_values(
+            ["start_seconds", "frame_seconds"], ascending=[True, True]
+        )
+
         return grouped_df
 
     def process_max_count(self, annotations_df: pd.DataFrame) -> pd.DataFrame:
@@ -92,20 +106,27 @@ class BiigleParser:
         """
         # Ensure correct ordering: highest count first, earliest frame/time in case of ties
         ordered_annotations_df = annotations_df.sort_values(
-            ["max_count", "time_of_max"], ascending=[False, True]
+            ["max_count", "start_seconds", "frame_seconds"],
+            ascending=[False, True, True],
         )
 
         # Drop duplicates, keeping only the "first" occurrence per video/species
         result_df = ordered_annotations_df.drop_duplicates(
             subset=["label_name"], keep="first"
         )
+
+        result_df = result_df.sort_values(
+            ["start_seconds", "frame_seconds"], ascending=[True, True]
+        )
+
         return result_df.reset_index(drop=True)
 
     def process_sizes(self, annotations_df: pd.DataFrame) -> pd.DataFrame:
-        if annotations_df[annotations_df["label_name"] == "___scale bar"].empty:
-            return pd.DataFrame()
 
         sizes_df = annotations_df[annotations_df["shape_name"] == "LineString"].copy()
+
+        if not (sizes_df["label_name"] == "___scale bar").any():
+            return pd.DataFrame()
 
         sizes_df["size_px"] = sizes_df["points"].apply(self.get_size)
 
@@ -117,6 +138,10 @@ class BiigleParser:
 
         # Drop scale bar:
         sizes_df = sizes_df[sizes_df["label_name"] != "___scale bar"]
+
+        sizes_df = sizes_df.sort_values(
+            ["start_seconds", "frame_seconds"], ascending=[True, True]
+        )
 
         return sizes_df[
             [
@@ -145,13 +170,13 @@ class BiigleParser:
             for (x1, y1), (x2, y2) in zip(points[:-1], points[1:])
         )
 
-    def extract_seconds(self, annotations_df):
+    def extract_time_values(self, annotations_df):
         # Extract start seconds from filename (e.g., ..._clip_115_30... -> 115)
-
         annotations_df["start_seconds"] = pd.to_numeric(
             annotations_df["video_filename"].str.extract(r"_clip_(\d+)_", expand=False),
             errors="coerce",
         ).astype("Int64")
+
         # Extract frame seconds from the "frames" '[seconds]' string
         annotations_df["frame_seconds"] = (
             annotations_df["frames"].str.strip("[]").astype(float)
@@ -171,10 +196,6 @@ class BiigleParser:
     def format_count_annotations_output(
         self, annotations_df: pd.DataFrame
     ) -> pd.DataFrame:
-        # TODO take explicit mentions of the column names out
-        annotations_df["DropID"] = self.current_drop_id
-
-        # TODO delete once all the labels are converted to the Common Name - Scientific Name label format on Biigle
         annotations_df["ScientificName"] = (
             annotations_df["label_name"]
             .str.split(" - ")

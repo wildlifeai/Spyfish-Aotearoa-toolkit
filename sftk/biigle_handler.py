@@ -24,24 +24,19 @@ Example usage:
 
 
     # Export annotations
-    annotations_df = biigle_handler.export_annotations(volume_id=12345)
+    annotations_df = biigle_handler.fetch_annotations_df(volume_id=12345)
 """
 
-import glob
+import io
 import logging
-import os
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from sftk.common import (
-    BIIGLE_ANNOTATION_REPORT_TYPE,
-    BIIGLE_DISK_ID,
-    BIIGLE_PROJECT_ID,
-    LOCAL_DATA_FOLDER_PATH,
-)
+from sftk.common import BIIGLE_ANNOTATION_REPORT_TYPE, BIIGLE_DISK_ID, BIIGLE_PROJECT_ID
 from sftk.external.biigle_api import Api
 
 
@@ -52,20 +47,14 @@ class BiigleHandler:
         """
         Initialize BiigleHandler with API credentials.
 
-
         Raises:
             ValueError: If credentials are not provided and not found in environment.
         """
         self.email = email
         self.token = token
 
-        # Import biigle API here to avoid import errors if not installed
         try:
             self.api = Api(self.email, self.token)
-        except ImportError as e:
-            raise ImportError(
-                "biigle package is required. Install from https://github.com/biigle/community-resources"
-            ) from e
         except Exception as e:
             raise Exception(f"Failed to initialize BIIGLE API: {e}") from e
 
@@ -216,19 +205,18 @@ class BiigleHandler:
             logging.error(f"Failed to create label tree: {e}")
             raise
 
-    def export_annotations(
-        self,
-        volume_id: int,
-        extract_dir: str = LOCAL_DATA_FOLDER_PATH,
-        type_id: int = BIIGLE_ANNOTATION_REPORT_TYPE,
+    def fetch_annotations_df(
+        self, volume_id: int, type_id: int = BIIGLE_ANNOTATION_REPORT_TYPE
     ) -> pd.DataFrame:
         """
-        Export annotations from a volume and return as DataFrame.
+        Create report for a volume, download its ZIP, extract CSV, and return a DataFrame.
+
+        Note: if you want a local export of the biigle zip file/report, check your email with
+            the associated biigle address. Or use the streamlit app to get the processed reports.
 
         Args:
             volume_id: The ID of the volume to export annotations from.
             type_id: The type ID for the report (default: 8 for annotations).
-            extract_dir: Directory to extract the downloaded files to.
 
         Returns:
             pd.DataFrame: DataFrame containing the annotation data.
@@ -236,61 +224,46 @@ class BiigleHandler:
         Raises:
             Exception: If the API call fails or file processing fails.
         """
-        try:
-            # Create annotation report
-            report_response = self.api.post(
-                f"volumes/{volume_id}/reports", json={"type_id": type_id}
-            )
-            report_info = report_response.json()
-            report_id = report_info["id"]
-            logging.info(f"Created annotation report with ID: {report_id}")
+        # Create annotation report
+        report_response = self.api.post(
+            f"volumes/{volume_id}/reports", json={"type_id": type_id}
+        )
+        report_response.raise_for_status()
+        report_id = report_response.json()["id"]
+        logging.info(f"Created annotation report with ID: {report_id}")
 
-            # Download the report
-            download_response = self.api.get(f"reports/{report_id}")
+        # Download the report
+        download_response = self.api.get(f"reports/{report_id}")
+        download_response.raise_for_status()
 
-            export_path = Path(extract_dir, "biigle_exports")
-            # Create extraction directory
-            os.makedirs(export_path, exist_ok=True)
-            # Save and extract the ZIP file
-            zip_file_path = Path(export_path, f"{volume_id}_biigle_annotations.zip")
-            with open(zip_file_path, "wb") as file:
-                file.write(download_response.content)
-
-            export_path = Path(export_path, f"{volume_id}_biigle_annotations_raw")
-
-            # Extract ZIP file
-            try:
-                with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
-                    zip_ref.extractall(export_path)
-                logging.info(f"Files extracted to: {export_path}")
-            except zipfile.BadZipFile:
-                raise Exception("The downloaded file is not a valid zip file.")
-
-            # Find and read the CSV file
-            csv_files = glob.glob(os.path.join(export_path, "*.csv"))
-
-            if not csv_files:
-                raise FileNotFoundError(f"No CSV files found in {export_path}")
-
-            if len(csv_files) > 1:
-                logging.warning(
-                    f"Multiple CSV files found. These are the file names: {csv_files}"
+        # Open the ZIP in-memory
+        with zipfile.ZipFile(io.BytesIO(download_response.content)) as zf:
+            # Extract to a temporary directory (auto-cleaned after use)
+            with tempfile.TemporaryDirectory() as tmp_root:
+                export_path = (
+                    Path(tmp_root)
+                    / "biigle_exports"
+                    / f"{volume_id}_biigle_annotations_raw"
                 )
+                export_path.mkdir(parents=True, exist_ok=True)
+                zf.extractall(export_path)
+                logging.info(f"Files extracted to (temp): {export_path}")
 
-                logging.info(f"Using the first one: {csv_files[0]}")
+                csv_files = sorted(export_path.glob("*.csv"))
+                if not csv_files:
+                    raise FileNotFoundError(f"No CSV files found in {export_path}.")
 
-            logging.info(f"Processing BUV Deployment: {csv_files[0]}")
+                if len(csv_files) > 1:
+                    logging.warning(
+                        f"Multiple CSV files found: {[p.name for p in csv_files]}"
+                    )
+                    logging.info(f"Using the first one: {csv_files[0].name}")
 
-            annotations_df = pd.read_csv(csv_files[0])
-            logging.info(
-                f"Loaded {len(annotations_df)} annotations from {csv_files[0]}"
-            )
-
-            return annotations_df
-
-        except Exception as e:
-            logging.error(f"Failed to export annotations: {e}")
-            raise
+                df = pd.read_csv(csv_files[0])
+                logging.info(
+                    f"Loaded {len(df)} rows from the {csv_files[0].name} csv file."
+                )
+                return df
 
     def get_volumes(self, project_id: int = BIIGLE_PROJECT_ID) -> List[Dict[str, Any]]:
         """
