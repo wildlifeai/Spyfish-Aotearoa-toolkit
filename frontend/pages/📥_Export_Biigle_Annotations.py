@@ -48,6 +48,12 @@ if submitted:
                     volume_id=int(volume_id_str)
                 )
 
+            if not processed:
+                st.warning(
+                    f"No annotations found for volume {volume_id_str}. The volume might be empty."
+                )
+                st.stop()
+
             # Extract dataframes
             drop_id = processed.get("drop_id")
             max_n_30s_df = processed.get("max_n_30s_df")
@@ -86,12 +92,9 @@ if submitted:
                     f"annotations_{drop_id}_max_n_30s.csv",
                 )
             with tab3:
-                if sizes_df.empty:
-                    st.info("No size annotations available.")
-                else:
-                    _render_df_section(
-                        sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
-                    )
+                _render_df_section(
+                    sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
+                )
         except Exception as e:
             st.error(f"An error occurred while fetching annotations: {e}")
             st.stop()
