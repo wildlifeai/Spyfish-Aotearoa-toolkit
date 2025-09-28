@@ -24,8 +24,12 @@ class BiigleParser:
     def process_video_annotations(
         self,
         volume_id: int,
-    ):
+    ) -> dict[str, pd.DataFrame]:
         annotations_df = self.biigle_handler.fetch_annotations_df(volume_id=volume_id)
+
+        if annotations_df.empty:
+            logging.info(f"No data found, seems like volume {volume_id} is empty. ")
+            return {}
 
         required_columns = [
             "label_name",
@@ -118,10 +122,11 @@ class BiigleParser:
         return result_df.reset_index(drop=True)
 
     def process_sizes(self, annotations_df: pd.DataFrame) -> pd.DataFrame:
-        if annotations_df[annotations_df["label_name"] == "___scale bar"].empty:
-            return pd.DataFrame()
 
         sizes_df = annotations_df[annotations_df["shape_name"] == "LineString"].copy()
+
+        if sizes_df[sizes_df["label_name"] == "___scale bar"].empty:
+            return pd.DataFrame()
 
         sizes_df["size_px"] = sizes_df["points"].apply(self.get_size)
 

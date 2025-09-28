@@ -11,16 +11,14 @@ st.set_page_config(
 )
 st.title("🐟  BIIGLE Annotation Fetcher")
 st.markdown(
-    "This app is used to retrieve and parse the annotation report from each of the Biigle clip groups.  \nIt allows you to export the MaxN total video, MaxN every 30 seconds, and size annotations.  \nFor more infor on where to get the form values, check the help icons next next to each entry.  \nIf there are any issues, or if it breaks please write an email to Kalindi, or open an issue on: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/issues"
+    "This app is used to retrieve and parse the annotation report from each of the Biigle clip groups.  \nIt allows you to export the MaxN total video, MaxN every 30 seconds, and size annotations.  \nFor more info on where to get the form values, check the help icons next to each entry.  \nIf there are any issues, or if it breaks please write an email to Kalindi, or open an issue on: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/issues"
 )
 
 
 with st.form("biigle_form"):
-    help_msg_email = "The email you sing in into biigle and the one associated with the volume you want to download."
-
-    help_msg_token = "A token is a special password like number used for the Biigle API.  \nFind yours here: https://biigle.de/settings/tokens, treat this token as you would a password."
-
-    help_msg_volume_id = "The ID of the video volume you want to export annotations from.  \nYou can find it on the url on biigle when you are on the page with all the clips:  \nFor example: https://biigle.de/volumes/25173, 25173 is the volume id."
+    help_msg_email = "The email you sign in to BIIGLE with and the one associated with the volume you want to download."
+    help_msg_token = "A token is a special password-like number used for the BIIGLE API.  \nFind yours here: https://biigle.de/settings/tokens. Treat this token as you would a password."
+    help_msg_volume_id = "The ID of the video volume you want to export annotations from.  \nYou can find it in the URL on BIIGLE when you are on the page with all the clips.  \nFor example: https://biigle.de/volumes/25173, 25173 is the volume ID."
 
     email = st.text_input(
         "Email", placeholder="you@example.com", help=help_msg_email
@@ -40,7 +38,7 @@ with st.form("biigle_form"):
 if submitted:
     # Validate before constructing anything
     if not (email and token and volume_id_str.isdigit()):
-        st.error("Please provide Base URL, Email, Token, and a numeric Volume ID.")
+        st.error("Please provide Email, Token, and a numeric Volume ID.")
 
     else:
         with st.spinner("Creating report and downloading ZIP…"):
@@ -55,38 +53,38 @@ if submitted:
         max_n_df = processed.get("max_n_df")
         sizes_df = processed.get("sizes_df")
 
-    def _render_df_section(df: pd.DataFrame | None, label: str, fname: str):
-        st.subheader(label)
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            st.caption(f"{len(df)} rows")
-            st.dataframe(df, width="stretch")
-            st.download_button(
-                label=f"Download {label} (CSV)",
-                data=df.to_csv(index=False).encode("utf-8"),
-                file_name=fname,
-                mime="text/csv",
-                width="stretch",
+        def _render_df_section(df: pd.DataFrame | None, label: str, fname: str):
+            st.subheader(label)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                st.caption(f"{len(df)} rows")
+                st.dataframe(df, width="stretch")
+                st.download_button(
+                    label=f"Download {label} (CSV)",
+                    data=df.to_csv(index=False).encode("utf-8"),
+                    file_name=fname,
+                    mime="text/csv",
+                    width="stretch",
+                )
+            else:
+                st.info(f"No data available for **{label}**.")
+
+        st.success(f"Loaded annotations for {drop_id}")
+
+        # TODO add some graphs here
+        tab1, tab2, tab3 = st.tabs(
+            ["Max N (whole video)", "Max N (every 30s)", "Size annotations"]
+        )
+        with tab1:
+            _render_df_section(
+                max_n_df, "Max N of whole video", f"annotations_{drop_id}_max_n.csv"
             )
-        else:
-            st.info(f"No data available for **{label}**.")
-
-    st.success(f"Loaded annotations for {drop_id}")
-
-    # TODO add some graphs here
-    tab1, tab2, tab3 = st.tabs(
-        ["Max N (whole video)", "Max N (every 30s)", "Size annotations"]
-    )
-    with tab1:
-        _render_df_section(
-            max_n_df, "Max N of whole video", f"annotations_{drop_id}_max_n.csv"
-        )
-    with tab2:
-        _render_df_section(
-            max_n_30s_df,
-            "Max N every 30 seconds",
-            f"annotations_{drop_id}_max_n_30s.csv",
-        )
-    with tab3:
-        _render_df_section(
-            sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
-        )
+        with tab2:
+            _render_df_section(
+                max_n_30s_df,
+                "Max N every 30 seconds",
+                f"annotations_{drop_id}_max_n_30s.csv",
+            )
+        with tab3:
+            _render_df_section(
+                sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
+            )
