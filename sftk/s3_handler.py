@@ -178,7 +178,7 @@ class S3Handler:
 
     def upload_file_to_s3(
         self,
-        filename: str,
+        filename: str | Path,
         key: str,
         bucket: str = S3_BUCKET,
         delete_file_after_upload=False,
@@ -191,6 +191,8 @@ class S3Handler:
             filename (str): The local filename to upload.
             key (str): The S3 object key.
             bucket (str): The S3 bucket name, defaults to env defined bucket.
+            delete_file_after_upload (bool, optional): If True, deletes the local file after a successful upload. Defaults to False.
+            content_type (Optional[str], optional): The content type of the file. If not provided, it's guessed. Defaults to None.
         """
         if content_type:
             content_args = {"ContentType": content_type}
@@ -265,7 +267,7 @@ class S3Handler:
             suffixes (tuple, optional): A tuple of lowercase file suffixes to
                 filter object keys (e.g., ("mp4", "jpg")). If empty, all objects
                 are returned regardless of suffix. Case-insensitive.
-            file_name_only: if True returns only file names
+            file_names_only (bool): If True, returns only file names instead of full S3 keys. Defaults to False.
 
         Returns:
             set[str]: A set of S3 object keys (strings) matching the specified
