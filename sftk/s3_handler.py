@@ -180,7 +180,7 @@ class S3Handler:
         self,
         filename: str,
         key: str,
-        bucket: str,
+        bucket: str = S3_BUCKET,
         delete_file_after_upload=False,
         content_type: Optional[str] = None,
     ) -> None:
@@ -215,6 +215,7 @@ class S3Handler:
             logging.info("Successfully uploaded file %s to S3", filename)
         except BotoCoreError as e:
             logging.error("Failed to upload file %s  to S3: %s", filename, str(e))
+            raise
         finally:
             if delete_file_after_upload:
                 delete_file(filename)
@@ -241,7 +242,7 @@ class S3Handler:
             df.to_csv(temp_filename, index=keep_df_index)
             self.upload_file_to_s3(temp_filename, key, bucket=S3_BUCKET)
             logging.info("Successfully uploaded updated %s data to S3", keyword)
-        except Exception as e:
+        except (BotoCoreError, IOError) as e:
             logging.error("Failed to upload updated %s data to S3: %s", keyword, e)
         finally:
             delete_file(temp_filename)
