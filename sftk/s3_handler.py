@@ -1,8 +1,10 @@
 import io
 import logging
+import mimetypes
 import os
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 import boto3
@@ -174,6 +176,52 @@ class S3Handler:
                 f"Failed to download or read S3 file {key}: {e}"
             ) from e
 
+    def upload_file_to_s3(
+        self,
+        filename: str,
+        key: str,
+        bucket: str = S3_BUCKET,
+        delete_file_after_upload=False,
+        content_type: Optional[str] = None,
+    ) -> None:
+        """
+        Uploads a file to S3 with progress bar and error handling.
+
+        Args:
+            filename (str): The local filename to upload.
+            key (str): The S3 object key.
+            bucket (str): The S3 bucket name, defaults to env defined bucket.
+            delete_file_after_upload (bool, optional): If True, deletes the local file after a successful upload. Defaults to False.
+            content_type (Optional[str], optional): The content type of the file. If not provided, it's guessed. Defaults to None.
+        """
+        if content_type:
+            content_args = {"ContentType": content_type}
+        else:
+            ct, _ = mimetypes.guess_type(filename)
+            content_args = {"ContentType": ct or "application/octet-stream"}
+        try:
+            with tqdm(
+                total=os.path.getsize(filename),
+                unit="B",
+                unit_scale=True,
+                desc=f"Uploading {filename}",
+            ) as pbar:
+                self.s3.upload_file(
+                    Filename=filename,
+                    Bucket=bucket,
+                    Key=key,
+                    ExtraArgs=content_args,
+                    Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
+                )
+
+            logging.info("Successfully uploaded file %s to S3", filename)
+        except BotoCoreError as e:
+            logging.error("Failed to upload file %s to S3: %s", filename, str(e))
+            raise
+        finally:
+            if delete_file_after_upload:
+                delete_file(filename)
+
     def upload_updated_df_to_s3(
         self,
         df: pd.DataFrame,
@@ -194,26 +242,19 @@ class S3Handler:
         temp_filename = f"updated_{keyword}_kso_temp.csv"
         try:
             df.to_csv(temp_filename, index=keep_df_index)
-            with tqdm(
-                total=os.path.getsize(temp_filename),
-                unit="B",
-                unit_scale=True,
-                desc=f"Uploading {keyword}",
-            ) as pbar:
-                self.s3.upload_file(
-                    Filename=temp_filename,
-                    Bucket=bucket,
-                    Key=key,
-                    Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
-                )
+            self.upload_file_to_s3(temp_filename, key, bucket=S3_BUCKET)
             logging.info("Successfully uploaded updated %s data to S3", keyword)
-        except BotoCoreError as e:
-            logging.error("Failed to upload updated %s data to S3: %s", keyword, str(e))
+        except (BotoCoreError, IOError) as e:
+            logging.error("Failed to upload updated %s data to S3: %s", keyword, e)
         finally:
             delete_file(temp_filename)
 
-    def get_set_filenames_from_s3(
-        self, bucket: str = S3_BUCKET, prefix: str = "", suffixes: tuple = ()
+    def get_file_paths_set_from_s3(
+        self,
+        bucket: str = S3_BUCKET,
+        prefix: str = "",
+        suffixes: tuple = (),
+        file_names_only: bool = False,
     ) -> set[str]:
         """
         Retrieve a set of all object keys (file paths) in an S3 bucket under
@@ -226,6 +267,7 @@ class S3Handler:
             suffixes (tuple, optional): A tuple of lowercase file suffixes to
                 filter object keys (e.g., ("mp4", "jpg")). If empty, all objects
                 are returned regardless of suffix. Case-insensitive.
+            file_names_only (bool): If True, returns only file names instead of full S3 keys. Defaults to False.
 
         Returns:
             set[str]: A set of S3 object keys (strings) matching the specified
@@ -237,7 +279,10 @@ class S3Handler:
             for obj in page.get("Contents", []):
                 # If there are no suffixes / if the path ends with one of the given suffixes
                 if not suffixes or obj["Key"].lower().endswith(tuple(suffixes)):
-                    s3_filepaths.add(obj["Key"])
+                    if file_names_only:
+                        s3_filepaths.add(Path(obj["Key"]).name)
+                    else:
+                        s3_filepaths.add(obj["Key"])
         return s3_filepaths
 
     def get_paths_from_csv(
@@ -318,7 +363,7 @@ class S3Handler:
         logging.info(f"Processing the files in the bucket: {s3_bucket}.")
 
         # Get all file paths currently in S3
-        s3_filepaths = self.get_set_filenames_from_s3(
+        s3_filepaths = self.get_file_paths_set_from_s3(
             bucket=s3_bucket, prefix=path_prefix
         )
 
@@ -339,7 +384,7 @@ class S3Handler:
         bucket=S3_BUCKET,
         try_run=False,
     ):
-        files_from_aws = self.get_set_filenames_from_s3(bucket, prefix, suffixes)
+        files_from_aws = self.get_file_paths_set_from_s3(bucket, prefix, suffixes)
 
         for old_name, new_name in rename_pairs.items():
 
