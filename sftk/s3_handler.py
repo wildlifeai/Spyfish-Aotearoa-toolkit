@@ -178,7 +178,7 @@ class S3Handler:
 
     def upload_file_to_s3(
         self,
-        filename: str | Path,
+        filename: str,
         key: str,
         bucket: str = S3_BUCKET,
         delete_file_after_upload=False,
@@ -216,7 +216,7 @@ class S3Handler:
 
             logging.info("Successfully uploaded file %s to S3", filename)
         except BotoCoreError as e:
-            logging.error("Failed to upload file %s  to S3: %s", filename, str(e))
+            logging.error("Failed to upload file %s to S3: %s", filename, str(e))
             raise
         finally:
             if delete_file_after_upload:
