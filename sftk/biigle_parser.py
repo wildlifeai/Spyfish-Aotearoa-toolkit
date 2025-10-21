@@ -125,19 +125,19 @@ class BiigleParser:
 
         sizes_df = annotations_df[annotations_df["shape_name"] == "LineString"].copy()
 
-        if not (sizes_df["label_name"] == "___scale bar").any():
+        if not (sizes_df["label_name"] == "Scale bar").any():
             return pd.DataFrame()
 
         sizes_df["size_px"] = sizes_df["points"].apply(self.get_size)
 
         # In case people drew more scale bars.
-        scale_size = sizes_df[sizes_df["label_name"] == "___scale bar"][
+        scale_size = sizes_df[sizes_df["label_name"] == "Scale bar"][
             "size_px"
         ].mean()
         sizes_df["size_cm"] = sizes_df["size_px"] * SCALE_BAR_LENGTH_CM / scale_size
 
         # Drop scale bar:
-        sizes_df = sizes_df[sizes_df["label_name"] != "___scale bar"]
+        sizes_df = sizes_df[sizes_df["label_name"] != "Scale bar"]
 
         sizes_df = sizes_df.sort_values(
             ["start_seconds", "frame_seconds"], ascending=[True, True]
