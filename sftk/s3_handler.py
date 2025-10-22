@@ -1,3 +1,24 @@
+"""
+S3 Handler Module
+=================
+
+Provides a singleton interface for AWS S3 operations. This module is designed to
+handle all interactions with S3, including file uploads, downloads, and listings.
+
+Required Environment Variables:
+    AWS_ACCESS_KEY_ID: AWS access key.
+    AWS_SECRET_ACCESS_KEY: AWS secret key.
+    S3_BUCKET: Default S3 bucket name.
+
+Optional Environment Variables:
+    S3_KSO_{TYPE}_CSV: KSO CSV file paths (e.g., S3_KSO_SURVEY_CSV).
+    S3_SHAREPOINT_{TYPE}_CSV: SharePoint CSV paths (e.g., S3_SHAREPOINT_SURVEY_CSV).
+
+Dependencies:
+    - boto3: AWS SDK for Python.
+    - pandas: For data manipulation, especially reading CSVs from S3.
+    - tqdm: For displaying progress bars during file transfers.
+"""
 import io
 import logging
 import mimetypes
@@ -5,7 +26,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 import boto3
 import pandas as pd
@@ -20,7 +41,6 @@ from sftk.utils import (
 )
 
 
-# TODO check when is this used
 class S3FileNotFoundError(Exception):
     """Custom exception for S3 file not found scenarios."""
 
@@ -80,21 +100,32 @@ class S3Handler:
         """
         Create a new instance of the class if one does not already exist.
 
+        Args:
+            bucket (str): The S3 bucket name.
         Returns:
             S3Handler: The instance of the class.
         """
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
-                # TODO create user input option
-                cls._instance.s3 = kwargs.get("s3_client") or boto3.client(
+                cls._instance._initialized = False  # Add initialization flag
+            return cls._instance
+
+    def __init__(self, s3_client: Optional[Any] = None, bucket: Optional[str] = None):
+        if self._initialized:
+            return
+
+        self.bucket = bucket or S3_BUCKET
+        if not self.bucket:
+            raise ValueError("S3_BUCKET environment variable not set or bucket not provided.")
+
+        self.s3 = s3_client or boto3.client(
                     "s3",
                     aws_access_key_id=AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
                 )
-                logging.info("Created a new instance of the S3Handler class.")
-
-            return cls._instance
+        self._initialized = True
+        logging.info("S3Handler initialized for bucket: %s", self.bucket)
 
     def __repr__(self) -> str:
         """
@@ -109,25 +140,42 @@ class S3Handler:
         self,
         key: str,
         filename: str,
-        version_id: Optional[str] = None,
-        bucket: str = S3_BUCKET,
-    ) -> None:
+        version_id: Optional[str] = None
+    ) -> bool:
         """
         Downloads an object from S3 with progress bar and error handling.
 
         Args:
-            key (str): The S3 object key.
-            filename (str): The local filename to save the object to.
-            version_id (str, optional): The version ID of the object.
-                Defaults to None.
-            bucket (str): The S3 bucket name, defaults to env defined bucket.
+            key: The S3 object key (path within the bucket).
+            filename: Local filesystem path where the file will be saved.
+            version_id: Optional version ID for versioned buckets.
+
+        Returns:
+            bool: True if download was successful, False otherwise.
 
         Raises:
-            ClientError: If the S3 object cannot be accessed or downloaded.
-            Exception: For other errors during download.
+            ValueError: If key or filename is empty.
+
+        Side Effects:
+            - Creates a local file at `filename`.
+            - Displays a progress bar to stdout.
+
+        Example:
+            >>> handler = S3Handler()
+            >>> handler.download_object_from_s3(
+            ...     key="media/survey1/video.mp4",
+            ...     filename="local_video.mp4"
+            ... )
+            local_video.mp4: 100%|████████| 50.0M/50.0M [00:05<00:00, 9.8MB/s]
+
+        Thread Safety:
+            This method is thread-safe for different files, but not for the
+            same filename due to filesystem constraints.
         """
+        if not key or not filename:
+            raise ValueError("S3 key and local filename must be provided.")
         try:
-            kwargs: Dict[str, Any] = {"Bucket": bucket, "Key": key}
+            kwargs: Dict[str, Any] = {"Bucket": self.bucket, "Key": key}
             if version_id:
                 kwargs["VersionId"] = version_id
 
@@ -140,18 +188,20 @@ class S3Handler:
                 total=object_size, unit="B", unit_scale=True, desc=filename
             ) as pbar:
                 self.s3.download_file(
-                    Bucket=bucket,
+                    Bucket=self.bucket,
                     Key=key,
                     Filename=filename,
                     Callback=progress_update,
                     Config=boto3.s3.transfer.TransferConfig(use_threads=False),
                 )
+            return True
         except BotoCoreError as e:
             logging.error("Failed to download %s from S3: %s", key, e)
-            raise S3FileNotFoundError(f"Failed to download {key} from S3: {e}") from e
+            return False
+
 
     def download_and_read_s3_file(
-        self, key: str, filename: str, bucket: str = S3_BUCKET
+        self, key: str, filename: str
     ) -> pd.DataFrame:
         """
         Downloads an S3 object and reads it into a Pandas DataFrame.
@@ -159,17 +209,17 @@ class S3Handler:
         Args:
             key (str): The S3 object key.
             filename (str): The local filename to save the downloaded object.
-            bucket (str): The S3 bucket name, defaults to env defined bucket.
 
         Returns:
             pd.DataFrame: The DataFrame read from the downloaded file.
 
         Raises:
-            Exceptions: If other errors occur during download or reading.
+            S3FileNotFoundError: If other errors occur during download or reading.
         """
         try:
-            self.download_object_from_s3(key=key, filename=filename, bucket=bucket)
-            return pd.read_csv(filename)
+            if self.download_object_from_s3(key=key, filename=filename):
+                return pd.read_csv(filename)
+            raise S3FileNotFoundError(f"Failed to download S3 file {key}")
         except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
             raise S3FileNotFoundError(
@@ -180,20 +230,29 @@ class S3Handler:
         self,
         filename: str,
         key: str,
-        bucket: str = S3_BUCKET,
         delete_file_after_upload=False,
-        content_type: Optional[str] = None,
-    ) -> None:
+        content_type: Optional[str] = None
+    ) -> bool:
         """
         Uploads a file to S3 with progress bar and error handling.
 
         Args:
             filename (str): The local filename to upload.
             key (str): The S3 object key.
-            bucket (str): The S3 bucket name, defaults to env defined bucket.
-            delete_file_after_upload (bool, optional): If True, deletes the local file after a successful upload. Defaults to False.
-            content_type (Optional[str], optional): The content type of the file. If not provided, it's guessed. Defaults to None.
+            delete_file_after_upload (bool): If True, deletes the local file after a successful upload.
+            content_type (Optional[str]): The content type of the file. If not provided, it's guessed.
+
+        Returns:
+            bool: True if upload succeeded, False otherwise.
+
+        Raises:
+            ValueError: If filename or key is empty.
+            FileNotFoundError: If the local file does not exist.
         """
+        if not filename or not key:
+            raise ValueError("Local filename and S3 key must be provided.")
+        if not os.path.exists(filename):
+            raise FileNotFoundError(f"Local file not found: {filename}")
         if content_type:
             content_args = {"ContentType": content_type}
         else:
@@ -208,16 +267,17 @@ class S3Handler:
             ) as pbar:
                 self.s3.upload_file(
                     Filename=filename,
-                    Bucket=bucket,
+                    Bucket=self.bucket,
                     Key=key,
                     ExtraArgs=content_args,
                     Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
                 )
 
             logging.info("Successfully uploaded file %s to S3", filename)
+            return True
         except BotoCoreError as e:
             logging.error("Failed to upload file %s to S3: %s", filename, str(e))
-            raise
+            return False
         finally:
             if delete_file_after_upload:
                 delete_file(filename)
@@ -227,8 +287,7 @@ class S3Handler:
         df: pd.DataFrame,
         key: str,
         keyword: str,
-        bucket: str = S3_BUCKET,
-        keep_df_index=True,
+        keep_df_index=True
     ) -> None:
         """
         Upload an updated DataFrame to S3 with progress bar and error handling.
@@ -237,13 +296,12 @@ class S3Handler:
             df (pd.DataFrame): DataFrame to upload.
             key (str): S3 key for the file.
             keyword (str): String identifier for the type of data (e.g., "survey", "site").
-            bucket (str): The S3 bucket name, defaults to env defined bucket.
+            keep_df_index (bool): Whether to write the DataFrame index to the CSV.
         """
         temp_filename = f"updated_{keyword}_kso_temp.csv"
         try:
             df.to_csv(temp_filename, index=keep_df_index)
-            self.upload_file_to_s3(temp_filename, key, bucket=S3_BUCKET)
-            logging.info("Successfully uploaded updated %s data to S3", keyword)
+            self.upload_file_to_s3(temp_filename, key, delete_file_after_upload=True)
         except (BotoCoreError, IOError) as e:
             logging.error("Failed to upload updated %s data to S3: %s", keyword, e)
         finally:
@@ -251,47 +309,52 @@ class S3Handler:
 
     def get_file_paths_set_from_s3(
         self,
-        bucket: str = S3_BUCKET,
+        prefix: str = "",
+        suffixes: tuple = ()
+    ) -> Set[str]:
+        """Retrieve a set of object keys from S3."""
+        keys = self.get_objects_from_s3(prefix, suffixes, keys_only=True, file_names_only=False)
+        return keys if isinstance(keys, set) else set()
+
+    def get_objects_from_s3(
+        self,
         prefix: str = "",
         suffixes: tuple = (),
+        keys_only: bool = False,
         file_names_only: bool = False,
-    ) -> set[str]:
+    ) -> Union[Set[str], List[Dict[str, Any]]]:
         """
-        Retrieve a set of all object keys (file paths) in an S3 bucket under
-        a given prefix, optionally filtering by file suffixes.
+        Unified method for retrieving S3 objects or their keys.
 
-        Parameters:
-            bucket (str): The S3 bucket name, defaults to env defined bucket.
-            prefix (str, optional): Folder path within the bucket to filter
-                objects. Defaults to "" (entire bucket).
-            suffixes (tuple, optional): A tuple of lowercase file suffixes to
-                filter object keys (e.g., ("mp4", "jpg")). If empty, all objects
-                are returned regardless of suffix. Case-insensitive.
-            file_names_only (bool): If True, returns only file names instead of full S3 keys. Defaults to False.
+        Args:
+            prefix (str, optional): Folder path to filter objects. Defaults to "".
+            suffixes (tuple, optional): File suffixes to filter by.
+            keys_only (bool): If True, returns a set of object keys. Otherwise, a list of object dicts.
+            file_names_only (bool): If True and keys_only is True, returns only file names.
 
         Returns:
-            set[str]: A set of S3 object keys (strings) matching the specified
-                prefix and suffixes.
+            Union[Set[str], List[Dict[str, Any]]]: A set of S3 object keys or a list of S3 object dictionaries.
         """
-        s3_filepaths = set()
+        results: Union[Set[str], List[Dict[str, Any]]] = set() if keys_only else []
         paginator = self.s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
-                # If there are no suffixes / if the path ends with one of the given suffixes
                 if not suffixes or obj["Key"].lower().endswith(tuple(suffixes)):
-                    if file_names_only:
-                        s3_filepaths.add(Path(obj["Key"]).name)
+                    if keys_only:
+                        key = Path(obj["Key"]).name if file_names_only else obj["Key"]
+                        # We know results is a set here
+                        results.add(key) # type: ignore
                     else:
-                        s3_filepaths.add(obj["Key"])
-        return s3_filepaths
+                        # We know results is a list here
+                        results.append(obj) # type: ignore
+        return results
 
     def get_paths_from_csv(
         self,
         csv_s3_path: str,
         csv_column: str,
         column_filter: Optional[str] = None,
-        column_value: Optional[Any] = None,
-        s3_bucket: str = S3_BUCKET,
+        column_value: Optional[Any] = None,# type: ignore
     ) -> Dict[str, set]:
         """
         Extract unique file paths from a CSV file stored in S3.
@@ -305,7 +368,6 @@ class S3Handler:
             csv_column: Name of the column containing file paths to extract
             column_filter: Optional column name to filter rows by
             column_value: Value that the filter column must equal to exclude rows
-            s3_bucket: S3 bucket name (defaults to S3_BUCKET constant)
 
         Returns:
             Dictionary with two keys:
@@ -332,7 +394,7 @@ class S3Handler:
         logging.info(f"Processing CSV: {csv_s3_path}.")
 
         # Load dataframe from AWS
-        csv_df = self.read_df_from_s3_csv(csv_s3_path, s3_bucket)
+        csv_df = self.read_df_from_s3_csv(csv_s3_path)
 
         # Load unique file paths from the CSV column excluding the filtered values
         csv_filepaths_without_filtered_values = get_unique_entries_df_column(
@@ -358,33 +420,31 @@ class S3Handler:
         self,
         valid_extensions: Iterable[str] = [],
         path_prefix: str = "",
-        s3_bucket: str = S3_BUCKET,
-    ) -> set[str]:
-        logging.info(f"Processing the files in the bucket: {s3_bucket}.")
+    ) -> Set[str]:
+        logging.info("Processing the files in the bucket: %s.", self.bucket)
 
         # Get all file paths currently in S3
         s3_filepaths = self.get_file_paths_set_from_s3(
-            bucket=s3_bucket, prefix=path_prefix
+            prefix=path_prefix
         )
 
+        # Filter only video files based on their extension
         if valid_extensions:
             s3_filepaths = filter_file_paths_by_extension(
                 s3_filepaths, valid_extensions
             )
-        # Filter only video files based on their extension
-        s3_filepaths_set = set(s3_filepaths)
-        logging.info(f"Video files in S3: {len(s3_filepaths_set)}")
-        return s3_filepaths_set
+
+        logging.info("Found %d files in S3 matching criteria.", len(s3_filepaths))
+        return s3_filepaths
 
     def rename_s3_objects_from_dict(
         self,
         rename_pairs: dict,
         prefix="",
         suffixes: Iterable = (),
-        bucket=S3_BUCKET,
         try_run=False,
-    ):
-        files_from_aws = self.get_file_paths_set_from_s3(bucket, prefix, suffixes)
+    ) -> None:
+        files_from_aws = self.get_file_paths_set_from_s3(prefix, suffixes)
 
         for old_name, new_name in rename_pairs.items():
 
@@ -393,37 +453,38 @@ class S3Handler:
                     if not try_run:
                         # Copy
                         self.s3.copy_object(
-                            Bucket=bucket,
-                            CopySource={"Bucket": bucket, "Key": old_name},
+                            Bucket=self.bucket,
+                            CopySource={"Bucket": self.bucket, "Key": old_name},
                             Key=new_name,
                         )
                         # Delete
-                        self.s3.delete_object(Bucket=bucket, Key=old_name)
+                        self.s3.delete_object(Bucket=self.bucket, Key=old_name)
                 except BotoCoreError as e:
                     logging.warning(
                         f"Failed to rename {old_name} to {new_name}, error: {str(e)}"
                     )
                 logging.info(f"Renamed: {old_name} ➜ {new_name}")
             else:
-                logging.info(f"File not found in the {S3_BUCKET} bucket: {old_name}.")
+                logging.info(f"File not found in the {self.bucket} bucket: {old_name}.")
 
         logging.info("Rename complete")
 
     def read_df_from_s3_csv(
-        self, csv_s3_path: str, s3_bucket: str = S3_BUCKET
+        self, csv_s3_path: str
     ) -> pd.DataFrame:
         """
         Downloads a CSV file from S3 and loads it into a pandas DataFrame.
 
         Parameters:
-            csv_filename (str): The name of the CSV file (e.g., 'data.csv').
-            csv_path (str): The S3 key prefix/path (e.g., 'folder/subfolder').
-            s3_bucket (str): The name of the S3 bucket, defaults to env defined bucket.
+            csv_s3_path (str): The S3 key for the CSV file.
 
         Returns:
             pd.DataFrame: The loaded DataFrame.
         """
-        # Download the object to memory
-        response = self.s3.get_object(Bucket=s3_bucket, Key=csv_s3_path)
-
-        return pd.read_csv(io.BytesIO(response["Body"].read()))
+        try:
+            # Download the object to memory
+            response = self.s3.get_object(Bucket=self.bucket, Key=csv_s3_path)
+            return pd.read_csv(io.BytesIO(response["Body"].read()))
+        except BotoCoreError as e:
+            logging.error("Failed to read CSV %s from S3: %s", csv_s3_path, e)
+            raise S3FileNotFoundError(f"Failed to read CSV {csv_s3_path} from S3: {e}") from e
