@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from IPython.display import HTML
 import subprocess
 import tempfile
 import time
@@ -451,6 +452,34 @@ class VideoProcessor:
             return pd.DataFrame()
 
         return pd.concat(files_to_remove_list)
+
+    def preview_movie(self, key: str, expiration: int = 26400) -> Optional[HTML]:
+        """
+        Generates an HTML video player for a movie in S3.
+
+        Args:
+            key (str): The S3 key of the movie file.
+            expiration (int): The URL's expiration time in seconds.
+
+        Returns:
+            Optional[HTML]: An IPython HTML object for display in a notebook, or None on failure.
+        """
+        movie_url = self.s3_handler.generate_presigned_url(key, expiration=expiration)
+
+        if not movie_url:
+            logger.error(f"Could not generate preview URL for {key}")
+            return None
+
+        html_code = f"""
+        <div style="display: flex; align-items: center; width: 100%;">
+            <div style="width: 60%; padding-right: 10px;">
+                <video width="100%" controls>
+                    <source src="{movie_url}">
+                </video>
+            </div>
+        </div>
+        """
+        return HTML(html_code)
 
 
 def _add_path_parts_to_df(df: pd.DataFrame) -> pd.DataFrame:

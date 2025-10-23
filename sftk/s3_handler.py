@@ -488,3 +488,23 @@ class S3Handler:
         except BotoCoreError as e:
             logging.error("Failed to read CSV %s from S3: %s", csv_s3_path, e)
             raise S3FileNotFoundError(f"Failed to read CSV {csv_s3_path} from S3: {e}") from e
+
+    def generate_presigned_url(self, key: str, expiration: int = 3600) -> Optional[str]:
+        """
+        Generate a presigned URL to share an S3 object.
+
+        Args:
+            key (str): The key of the object for which to generate the URL.
+            expiration (int): Time in seconds for the presigned URL to remain valid.
+
+        Returns:
+            Optional[str]: The presigned URL, or None if an error occurred.
+        """
+        try:
+            response = self.s3.generate_presigned_url('get_object',
+                                                      Params={'Bucket': self.bucket, 'Key': key},
+                                                      ExpiresIn=expiration)
+            return response
+        except BotoCoreError as e:
+            logging.error(f"Failed to generate presigned URL for {key}: {e}")
+            return None
