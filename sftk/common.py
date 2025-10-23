@@ -16,8 +16,17 @@ def load_env_wrapper() -> None:
     if os.getenv("GITHUB_ACTIONS") == "true":
         return
 
-    load_dotenv(override=True)
-
+    # Construct the path to the .env file in your home directory
+    # The os.path.expanduser('~') command automatically gets your home directory path
+    env_path = os.path.expanduser('~/.env')
+    
+    # Check if the file exists before trying to load it
+    if os.path.exists(env_path):
+        print(f"Loading .env file from: {env_path}")
+        load_dotenv(dotenv_path=env_path, override=True)
+    else:
+        print(f"Warning: .env file not found at {env_path}")
+    
 
 load_env_wrapper()
 
