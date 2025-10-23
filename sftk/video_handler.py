@@ -429,7 +429,7 @@ class VideoProcessor:
         if output_path and output_path.exists():
             output_path.unlink()
 
-    def find_already_concatenated_movies_df(self, size_tolerance: float = 0.01) -> pd.DataFrame:
+    def find_already_concatenated_movies_df(self, size_tolerance: float = 0.01, ) -> pd.DataFrame:
         """Find individual movie files that can be removed because a concatenated version already exists."""
         concatenated_movies = self.movies_df[self.movies_df["fileNameNoExt"] == self.movies_df["DropID"]]
         gopro_movies = self.movies_df[self.movies_df.fileName.str.startswith(self.gopro_prefix, na=False)]
@@ -500,12 +500,11 @@ def get_filtered_movies_df(
     movies_df: pd.DataFrame, gopro_prefix: str = "GX"
 ) -> pd.DataFrame:
     """Filter movies DataFrame to find GoPro groups that need concatenation."""
-    df = _add_path_parts_to_df(movies_df)
-    go_pro_movies_df = df[df.fileName.str.startswith(gopro_prefix, na=False)].copy()
+    go_pro_movies_df = movies_df[movies_df.fileName.str.startswith(gopro_prefix, na=False)].copy()
 
     # Find DropIDs that already have a concatenated file
-    df["fileNameNoExt"] = df["fileName"].str.replace(".mp4", "", case=False)
-    matching_dropids = df[df["fileNameNoExt"] == df["DropID"]]["DropID"].unique()
+    movies_df["fileNameNoExt"] = movies_df["fileName"].str.replace(".mp4", "", case=False)
+    matching_dropids = movies_df[movies_df["fileNameNoExt"] == movies_df["DropID"]]["DropID"].unique()
 
     # Exclude groups that already have a concatenated file
     df_no_matching = go_pro_movies_df[~go_pro_movies_df["DropID"].isin(matching_dropids)]
