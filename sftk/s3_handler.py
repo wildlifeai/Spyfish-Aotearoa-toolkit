@@ -451,13 +451,13 @@ class S3Handler:
             if old_name in files_from_aws:
                 try:
                     if not try_run:
-                        # Copy
-                        self.s3.copy_object(
-                            Bucket=self.bucket,
-                            CopySource={"Bucket": self.bucket, "Key": old_name},
-                            Key=new_name,
-                        )
-                        # Delete
+                        # Use the higher-level copy method which handles multipart copies for large files
+                        copy_source = {
+                            'Bucket': self.bucket,
+                            'Key': old_name
+                        }
+                        self.s3.copy(copy_source, self.bucket, new_name)
+                        # Delete the old object
                         self.s3.delete_object(Bucket=self.bucket, Key=old_name)
                 except BotoCoreError as e:
                     logging.warning(
