@@ -73,18 +73,22 @@ def _process_single_drop(
     test_mode: bool,
     max_workers: int,
     sequential_download: bool,
+    s3_bucket: str,  # Pass bucket name instead of handler
     log_queue: Optional[Queue] = None,
 ) -> None:
     """
     Process a single drop's worth of videos.
     """
+    # Log immediately to confirm worker started
+    drop_id = drop_data_dict.get('drop_id', 'UNKNOWN')
+    print(f"[WORKER START] Processing {drop_id}", flush=True)
+    
     if log_queue:
         _worker_log_config(log_queue)
     
     # Get logger AFTER configuring it
     process_logger = logging.getLogger(__name__)
     
-    drop_id = drop_data_dict['drop_id']
     keys = drop_data_dict['keys']
     sizes = drop_data_dict['sizes']
     survey_id = drop_data_dict['survey_id']
@@ -94,7 +98,12 @@ def _process_single_drop(
     process_logger.info(f"   Files to process: {len(keys)}")
     process_logger.info(f"{'='*60}")
     
+    # Create S3Handler in worker process (unavoidable for multiprocessing)
+    # But only log it at debug level
+    from sftk.s3_handler import S3Handler
     s3_handler = S3Handler()
+    process_logger.debug(f"S3Handler initialized for worker processing {drop_id}")
+    
     downloaded_files = []
     output_path = None
     drop_download_dir: Optional[Path] = None
@@ -144,6 +153,13 @@ def _process_single_drop(
         base_download_dir = Path(download_dir)
         drop_download_dir = base_download_dir / drop_id
         drop_download_dir.mkdir(parents=True, exist_ok=True)
+        
+        output_path = Path(output_dir) / f"{drop_id}.mp4"
+        
+        # Check if output already exists (race condition protection)
+        if output_path.exists():
+            process_logger.warning(f"⚠ Output file {output_path.name} already exists, skipping processing")
+            return
 
         # Create list of (key, size) tuples
         keys_with_sizes = list(zip(keys, sizes))
@@ -187,12 +203,14 @@ def _process_single_drop(
             if f.stat().st_size == 0:
                 raise RuntimeError(f"File {f.name} is empty (0 bytes)")
 
-        output_path = Path(output_dir) / f"{drop_id}.mp4"
+        survey_id = drop_data_dict['survey_id']
         
         # Create temporary VideoProcessor instance for this drop
+        # IMPORTANT: Pass delete_originals from parent to ensure correct behavior
         temp_processor = VideoProcessor(
             s3_handler, 
             test_mode=test_mode,
+            delete_originals=delete_originals,  # Pass through from parent
             _skip_init_logs=True  # Skip repeated initialization logs
         )
         
@@ -252,6 +270,7 @@ class VideoProcessor:
         self.max_workers = max_workers
         self.parallel_drops = parallel_drops
         self.sequential_download = sequential_download
+        self._skip_init_logs = _skip_init_logs  # Store the flag
 
         if not _skip_init_logs:
             logger.info(f"{'='*80}")
@@ -289,6 +308,14 @@ class VideoProcessor:
                 movies_df=movies_df_with_parts.copy(), 
                 gopro_prefix=self.gopro_prefix
             )
+            
+            # Debug: Check for duplicate Keys in filtered_df
+            if not self.filtered_df.empty:
+                duplicate_keys = self.filtered_df[self.filtered_df.duplicated(subset=['Key'], keep=False)]
+                if not duplicate_keys.empty:
+                    logger.error(f"⚠ WARNING: Found {len(duplicate_keys)} duplicate Keys in filtered_df!")
+                    logger.error(f"   Duplicate Keys: {duplicate_keys['Key'].tolist()}")
+            
             num_drops = self.filtered_df['DropID'].nunique() if not self.filtered_df.empty else 0
             logger.info(f"🎬 Found {num_drops} drop(s) that require concatenation")
             logger.info(f"{'='*80}\n")
@@ -327,17 +354,26 @@ class VideoProcessor:
         file_size_mb = output_path.stat().st_size / (1024 * 1024)
         logger.info(f"✅ Successfully uploaded {file_size_mb:.2f} MB in {upload_time:.2f}s to: {new_key}")
 
+        # Log the delete_originals setting for debugging
+        logger.info(f"🔧 delete_originals setting: {self.delete_originals}")
+        
         if self.delete_originals:
             logger.info(f"🗑️  Deleting {len(upload_data['Key'])} original file(s) from S3...")
             deleted_count = 0
+            failed_count = 0
             for key in upload_data['Key']:
                 try:
                     self.s3_handler.s3.delete_object(Bucket=self.s3_handler.bucket, Key=key)
                     deleted_count += 1
-                    logger.info(f"   ✓ Deleted: {Path(key).name}")
+                    logger.info(f"   ✓ Deleted from S3: {Path(key).name}")
                 except Exception as e:
+                    failed_count += 1
                     logger.error(f"   ✗ Failed to delete {Path(key).name}: {e}")
-            logger.info(f"✅ Deleted {deleted_count}/{len(upload_data['Key'])} original files from S3")
+            
+            if failed_count > 0:
+                logger.warning(f"⚠ Deleted {deleted_count}/{len(upload_data['Key'])} files ({failed_count} failed)")
+            else:
+                logger.info(f"✅ Successfully deleted all {deleted_count} original files from S3")
         else:
             logger.info(f"ℹ️  Keeping original files in S3 (delete_originals=False)")
 
@@ -598,10 +634,22 @@ class VideoProcessor:
             logger.info("ℹ️  No GoPro videos found that require concatenation")
             return
 
-        drop_ids = self.filtered_df["DropID"].unique()
+        # CRITICAL: Use drop_duplicates on DropID to ensure each drop appears only once
+        unique_drops_df = self.filtered_df.drop_duplicates(subset=['DropID'])
+        drop_ids = unique_drops_df["DropID"].unique()
+        
+        logger.info(f"🔍 Found {len(drop_ids)} unique drop IDs to process")
+        
         valid_drops = []
+        valid_drop_ids_set = set()  # Extra safety: track which drops we've added
         
         for drop_id in drop_ids:
+            # Double-check we haven't added this drop already
+            if drop_id in valid_drop_ids_set:
+                logger.warning(f"⚠ Skipping duplicate DropID in loop: {drop_id}")
+                continue
+            
+            # Get all rows for this drop_id from the ORIGINAL filtered_df
             drop_data = self.filtered_df[self.filtered_df["DropID"] == drop_id]
             
             # Verify all files start with gopro_prefix
@@ -614,6 +662,7 @@ class VideoProcessor:
                     'survey_id': drop_data["SurveyID"].iloc[0]
                 }
                 valid_drops.append((drop_id, drop_dict))
+                valid_drop_ids_set.add(drop_id)  # Mark as added
             else:
                 logger.warning(
                     f"⚠ Skipping DropID {drop_id}: Not all videos start with {self.gopro_prefix}"
@@ -622,6 +671,31 @@ class VideoProcessor:
         if self.test_mode and valid_drops:
             valid_drops = valid_drops[-1:]
             logger.info(f"🧪 Test mode enabled: Processing only the last drop")
+        
+        # FINAL SAFETY CHECK: Verify no duplicates in valid_drops
+        drop_id_list = [drop_id for drop_id, _ in valid_drops]
+        unique_drop_ids = set(drop_id_list)
+        
+        if len(drop_id_list) != len(unique_drop_ids):
+            from collections import Counter
+            counts = Counter(drop_id_list)
+            duplicates = {item: count for item, count in counts.items() if count > 1}
+            
+            logger.error(f"❌ CRITICAL ERROR: Duplicate drop IDs detected in valid_drops!")
+            logger.error(f"   Total drops in list: {len(drop_id_list)}")
+            logger.error(f"   Unique drops: {len(unique_drop_ids)}")
+            logger.error(f"   Duplicates: {duplicates}")
+            
+            # Remove duplicates by keeping only first occurrence
+            seen = set()
+            valid_drops_deduped = []
+            for drop_id, drop_dict in valid_drops:
+                if drop_id not in seen:
+                    valid_drops_deduped.append((drop_id, drop_dict))
+                    seen.add(drop_id)
+            
+            valid_drops = valid_drops_deduped
+            logger.warning(f"   ⚠ After forced deduplication: {len(valid_drops)} drops")
         
         logger.info(f"📊 Processing {len(valid_drops)} valid drop(s)\n")
 
@@ -639,12 +713,23 @@ class VideoProcessor:
         processing_start = time.time()
         successful = 0
         failed = 0
+        
+        logger.info(f"🚀 Starting parallel processing with {self.max_workers} workers...\n")
 
         try:
             if self.parallel_drops:
                 with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                    futures_to_drop_id = {
-                        executor.submit(
+                    futures_to_drop_id = {}
+                    submitted_drops = set()  # Track which drops have been submitted
+                    
+                    for drop_id, drop_dict in valid_drops:
+                        # Extra safety: don't submit if already submitted
+                        if drop_id in submitted_drops:
+                            logger.error(f"❌ Prevented duplicate submission of {drop_id}")
+                            continue
+                        
+                        logger.debug(f"📤 Submitting {drop_id} to executor...")
+                        future = executor.submit(
                             _process_single_drop,
                             drop_dict,
                             str(self.download_dir),
@@ -653,19 +738,29 @@ class VideoProcessor:
                             self.test_mode,
                             self.max_workers,
                             self.sequential_download,
+                            self.s3_handler.bucket,
                             log_queue,
-                        ): drop_id for drop_id, drop_dict in valid_drops
-                    }
+                        )
+                        futures_to_drop_id[future] = drop_id
+                        submitted_drops.add(drop_id)
                     
-                    for future in as_completed(futures_to_drop_id):
+                    logger.info(f"✅ Submitted {len(futures_to_drop_id)} task(s) to executor\n")
+                    
+                    # Wait for all futures to complete
+                    for i, future in enumerate(as_completed(futures_to_drop_id), 1):
                         drop_id = futures_to_drop_id[future]
+                        logger.debug(f"Processing result {i}/{len(futures_to_drop_id)} for {drop_id}")
                         try:
-                            future.result()
+                            future.result(timeout=7200)  # 2 hour timeout per drop
                             successful += 1
-                            logger.info(f"✅ Successfully processed DropID {drop_id}\n")
+                            logger.info(f"✅ Successfully processed DropID {drop_id} ({successful}/{len(futures_to_drop_id)})\n")
+                        except TimeoutError:
+                            failed += 1
+                            logger.error(f"❌ Timeout processing DropID {drop_id} (exceeded 2 hours)\n")
                         except Exception as e:
                             failed += 1
                             logger.error(f"❌ Error processing DropID {drop_id}: {e}\n")
+                            logger.exception("Full traceback:")
             else:
                 for drop_id, drop_dict in valid_drops:
                     try:
@@ -677,6 +772,7 @@ class VideoProcessor:
                             self.test_mode,
                             self.max_workers,
                             self.sequential_download,
+                            self.s3_handler.bucket,  # Pass bucket name
                             None,
                         )
                         successful += 1
@@ -852,4 +948,9 @@ def get_filtered_movies_df(
     grouped_counts = df_no_matching.groupby("DropID")["fileName"].nunique()
     filtered_dropids = grouped_counts[grouped_counts > 1].index
 
-    return df_no_matching[df_no_matching["DropID"].isin(filtered_dropids)]
+    result_df = df_no_matching[df_no_matching["DropID"].isin(filtered_dropids)]
+    
+    # CRITICAL FIX: Remove duplicate rows based on Key (same file shouldn't appear twice)
+    result_df = result_df.drop_duplicates(subset=['Key'])
+    
+    return result_df
