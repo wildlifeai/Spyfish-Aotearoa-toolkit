@@ -373,7 +373,7 @@ def test_relationship_validator_dropid_full_mismatch():
         "file_name": "test.csv",
         "relationships": [
             {
-                "column": "DropID",
+                "column": DROPID_COLUMN,
                 "rule": "equals",
                 "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             }
