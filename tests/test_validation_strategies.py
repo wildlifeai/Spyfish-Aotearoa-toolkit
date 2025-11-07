@@ -324,3 +324,108 @@ def test_validation_config_methods_consistency():
     config.column_relationships = False
     config.file_presence = False
     assert not config.any_enabled()
+
+
+def test_relationship_validator_dropid_replicate_mismatch():
+    """RelationshipValidator should provide specific error message for DropID replicate mismatch."""
+    from sftk.validation_strategies import RelationshipValidator
+    from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+
+    validator = RelationshipValidator({})
+
+    # Test case where only the replicate part (last 2 digits) is different
+    rules = {
+        "file_name": "test.csv",
+        "relationships": [
+            {
+                "column": DROPID_COLUMN,
+                "rule": "equals",
+                "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
+            }
+        ],
+    }
+
+    # Create test data where DropID ends with '01' but ReplicateWithinSite is 2 (should be '02')
+    df = pd.DataFrame({
+        "DropID": ["HOR_20211122_BUV_HOR_003_01"],
+        "SurveyID": ["HOR_20211122_BUV"],
+        "SiteID": ["HOR_003"],
+        "ReplicateWithinSite": [2]  # This should make expected DropID end with '02'
+    })
+
+    errors = validator.validate(rules, df)
+
+    assert len(errors) == 1
+    error_message = errors[0].error_info
+    assert "ReplicateWithinSite mismatch" in error_message
+    assert "should end with '02' but ends with '01'" in error_message
+    assert "HOR_20211122_BUV_HOR_003_02" in error_message  # Expected value
+    assert "HOR_20211122_BUV_HOR_003_01" in error_message  # Actual value
+
+
+def test_relationship_validator_dropid_full_mismatch():
+    """RelationshipValidator should provide generic error message for full DropID mismatch."""
+    from sftk.validation_strategies import RelationshipValidator
+
+    validator = RelationshipValidator({})
+
+    rules = {
+        "file_name": "test.csv",
+        "relationships": [
+            {
+                "column": DROPID_COLUMN,
+                "rule": "equals",
+                "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
+            }
+        ],
+    }
+
+    # Create test data where DropID has different SiteID (not just replicate mismatch)
+    df = pd.DataFrame({
+        "DropID": ["HOR_20211122_BUV_HOR_004_01"],  # Different SiteID (004 vs 003)
+        "SurveyID": ["HOR_20211122_BUV"],
+        "SiteID": ["HOR_003"],
+        "ReplicateWithinSite": [2]
+    })
+
+    errors = validator.validate(rules, df)
+
+    assert len(errors) == 1
+    error_message = errors[0].error_info
+    # Should use generic message, not replicate-specific message
+    assert "ReplicateWithinSite mismatch" not in error_message
+    assert "DropID should be" in error_message
+    assert "HOR_20211122_BUV_HOR_003_02" in error_message  # Expected value
+    assert "HOR_20211122_BUV_HOR_004_01" in error_message  # Actual value
+
+
+def test_is_replicate_mismatch_only_helper():
+    """Test the helper method _is_replicate_mismatch_only."""
+    from sftk.validation_strategies import RelationshipValidator
+
+    validator = RelationshipValidator({})
+
+    # Test replicate-only mismatch (should return True)
+    actual = "HOR_20211122_BUV_HOR_003_01"
+    expected = "HOR_20211122_BUV_HOR_003_02"
+    assert validator._is_replicate_mismatch_only(actual, expected) is True
+
+    # Test different site ID (should return False)
+    actual = "HOR_20211122_BUV_HOR_004_01"
+    expected = "HOR_20211122_BUV_HOR_003_02"
+    assert validator._is_replicate_mismatch_only(actual, expected) is False
+
+    # Test different survey ID (should return False)
+    actual = "TON_20211026_BUV_TON_033_01"
+    expected = "HOR_20211122_BUV_TON_033_01"
+    assert validator._is_replicate_mismatch_only(actual, expected) is False
+
+    # Test same strings (should return False)
+    actual = "HOR_20211122_BUV_HOR_003_01"
+    expected = "HOR_20211122_BUV_HOR_003_01"
+    assert validator._is_replicate_mismatch_only(actual, expected) is False
+
+    # Test different lengths (should return False)
+    actual = "HOR_20211122_BUV_HOR_003_1"
+    expected = "HOR_20211122_BUV_HOR_003_02"
+    assert validator._is_replicate_mismatch_only(actual, expected) is False

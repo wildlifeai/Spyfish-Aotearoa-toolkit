@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Set
 import pandas as pd
 
 from sftk.utils import normalize_file_name
+from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
 
 
 class CleanRowTracker:
@@ -658,7 +659,11 @@ class RelationshipValidator(ValidationStrategy):
             )
 
         if rule == "equals" and str(actual) != str(expected):
-            message = f"{col_name} should be '{expected}', but is '{actual}'"
+            # Check for specific DropID replicate mismatch case    
+            if col_name == DROPID_COLUMN and self._is_replicate_mismatch_only(str(actual), str(expected)):
+                message = f"{REPLICATE_COLUMN} mismatch: {col_name} should end with '{str(expected)[-2:]}' but ends with '{str(actual)[-2:]}'. Full {col_name} should be '{expected}', but is '{actual}'"
+            else:
+                message = f"{col_name} should be '{expected}', but is '{actual}'"
 
             return self.create_error(
                 message=message,
@@ -669,6 +674,24 @@ class RelationshipValidator(ValidationStrategy):
             )
 
         return None
+
+    def _is_replicate_mismatch_only(self, actual: str, expected: str) -> bool:
+        """
+        Check if the mismatch is only in the replicate part (last 2 digits).
+
+        Args:
+            actual: The actual value
+            expected: The expected value
+
+        Returns:
+            True if only the last 2 digits differ, False otherwise
+        """
+        # Both strings should have the same length and be long enough
+        if len(actual) != len(expected) or len(actual) < 2:
+            return False
+
+        # Check if everything except the last 2 characters is the same
+        return actual[:-2] == expected[:-2] and actual[-2:] != expected[-2:]
 
 
 class FilePresenceValidator(ValidationStrategy):
