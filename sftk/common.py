@@ -91,6 +91,12 @@ S3_KSO_ERRORS_CSV = os.path.join(S3_KSO_PATH, "errors_buv_doc.csv")
 S3_KSO_TEST_CSV = os.path.join(S3_KSO_PATH, "test_buv_doc.csv")
 
 
+# Specific Column names used in Sharepoint 
+# TODO create variables for all columns used below
+DROPID_COLUMN = "DropID"
+REPLICATE_COLUMN = "ReplicateWithinSite"
+
+
 # Keywords to monitor in email
 KEYWORDS = [
     "survey",
@@ -101,7 +107,7 @@ KEYWORDS = [
 KEYWORD_LOOKUP = {
     "survey": "SurveyID",
     "site": "SiteID",
-    "movie": "DropID",
+    "movie": DROPID_COLUMN,
     "species": "ScientificName",
 }
 
@@ -113,17 +119,18 @@ MOVIE_EXTENSIONS = [
     "wmv",
 ]
 
+
 VALIDATION_RULES = {
     "deployments": {
         "file_name": S3_SHAREPOINT_DEPLOYMENT_CSV,
         # TODO add fps, sampling start and end etc.
-        "required": ["DropID", "SurveyID", "SiteID", "FileName", "LinkToVideoFile"],
-        "unique": ["DropID"],
+        "required": [DROPID_COLUMN, "SurveyID", "SiteID", "FileName", "LinkToVideoFile"],
+        "unique": [DROPID_COLUMN],
         "info_columns": ["SurveyID", "SiteID"],
         "foreign_keys": {"surveys": "SurveyID", "sites": "SiteID"},
         "relationships": [
             {
-                "column": "DropID",
+                "column": DROPID_COLUMN,
                 "rule": "equals",
                 "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             },
@@ -203,7 +210,9 @@ FILE_PRESENCE_RULES = {
 
 
 VALIDATION_PATTERNS = {
-    "DropID": r"^[A-Z]{3}_\d{8}_BUV_[A-Z]{3}_\d{3}_\d{2}$",
+    DROPID_COLUMN: r"^[A-Z]{3}_\d{8}_BUV_[A-Z]{3}_\d{3}_\d{2}$",
     "SurveyID": r"^[A-Z]{3}_\d{8}_BUV$",
     "SiteID": r"^[A-Z]{3}_\d+$",
 }
+
+
