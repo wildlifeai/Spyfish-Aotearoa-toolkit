@@ -139,7 +139,8 @@ class S3Handler:
     def download_object_from_s3(
         self,
         key: str,
-        filename: str,
+        filename: str, 
+        callback=None,
         version_id: Optional[str] = None
     ) -> bool:
         """
@@ -148,6 +149,8 @@ class S3Handler:
         Args:
             key: The S3 object key (path within the bucket).
             filename: Local filesystem path where the file will be saved.
+            callback: Optional callback function for progress tracking.
+                    Will be called with bytes_transferred as argument.
             version_id: Optional version ID for versioned buckets.
 
         Returns:
@@ -158,7 +161,7 @@ class S3Handler:
 
         Side Effects:
             - Creates a local file at `filename`.
-            - Displays a progress bar to stdout.
+            - Displays a progress bar to stdout (if no callback provided).
 
         Example:
             >>> handler = S3Handler()
@@ -174,29 +177,60 @@ class S3Handler:
         """
         if not key or not filename:
             raise ValueError("S3 key and local filename must be provided.")
+        
         try:
+            from boto3.s3.transfer import TransferConfig
+            
             kwargs: Dict[str, Any] = {"Bucket": self.bucket, "Key": key}
             if version_id:
                 kwargs["VersionId"] = version_id
 
             object_size = self.s3.head_object(**kwargs)["ContentLength"]
 
-            def progress_update(bytes_transferred):
-                pbar.update(bytes_transferred)
+            # Configure transfer for better performance with large files
+            config = TransferConfig(
+                max_concurrency=10,
+                multipart_threshold=8 * 1024 * 1024,  # 8MB
+                multipart_chunksize=8 * 1024 * 1024,  # 8MB
+                num_download_attempts=3,
+                use_threads=True  # Enable multi-threading for better performance
+            )
 
-            with tqdm(
-                total=object_size, unit="B", unit_scale=True, desc=filename
-            ) as pbar:
+            if callback:
+                # Use custom callback (for parallel processing with minimal logging)
                 self.s3.download_file(
                     Bucket=self.bucket,
                     Key=key,
                     Filename=filename,
-                    Callback=progress_update,
-                    Config=boto3.s3.transfer.TransferConfig(use_threads=False),
+                    Callback=callback,
+                    Config=config
                 )
+            else:
+                # Use tqdm progress bar (for interactive/sequential downloads)
+                def progress_update(bytes_transferred):
+                    pbar.update(bytes_transferred)
+
+                with tqdm(
+                    total=object_size, 
+                    unit="B", 
+                    unit_scale=True, 
+                    desc=Path(filename).name
+                ) as pbar:
+                    self.s3.download_file(
+                        Bucket=self.bucket,
+                        Key=key,
+                        Filename=filename,
+                        Callback=progress_update,
+                        Config=config
+                    )
+            
             return True
+            
         except BotoCoreError as e:
             logging.error("Failed to download %s from S3: %s", key, e)
+            return False
+        except Exception as e:
+            logging.error("Unexpected error downloading %s from S3: %s", key, e)
             return False
 
 

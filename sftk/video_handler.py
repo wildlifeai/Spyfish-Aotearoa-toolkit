@@ -8,6 +8,8 @@ from IPython.display import HTML
 import subprocess
 import tempfile
 import time
+import threading
+import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 from pathlib import Path
 from typing import List, Optional
@@ -19,6 +21,64 @@ from sftk.common import S3_BUCKET
 
 logger = logging.getLogger(__name__)
 
+class ProgressTracker:
+    """Thread-safe progress tracker for S3 downloads."""
+    
+    def __init__(self, filename: str, total_size: int, log_interval: float = 10.0):
+        """
+        Initialize progress tracker.
+        
+        Args:
+            filename: Name of file being downloaded
+            total_size: Total size in bytes
+            log_interval: Seconds between progress logs (default 10s)
+        """
+        self.filename = filename
+        self.total_size = total_size
+        self.downloaded = 0
+        self.lock = threading.Lock()
+        self.start_time = time.time()
+        self.last_log_time = time.time()
+        self.log_interval = log_interval
+        
+    def __call__(self, bytes_amount: int):
+        """Callback called by boto3 during download."""
+        with self.lock:
+            self.downloaded += bytes_amount
+            current_time = time.time()
+            
+            # Only log periodically to avoid spam
+            if current_time - self.last_log_time >= self.log_interval:
+                self._log_progress()
+                self.last_log_time = current_time
+    
+    def _log_progress(self):
+        """Log current progress."""
+        if self.total_size > 0:
+            percent = (self.downloaded / self.total_size) * 100
+            elapsed = time.time() - self.start_time
+            speed_mbps = (self.downloaded / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+            eta_seconds = ((self.total_size - self.downloaded) / (self.downloaded / elapsed)) if self.downloaded > 0 and elapsed > 0 else 0
+            # 1. Calculate the timedelta object
+            eta_delta = datetime.timedelta(seconds=max(0, eta_seconds))
+            # 2. Format the timedelta object into HH:MM:SS string
+            # This converts the delta to H:MM:SS format (e.g., 1:05:30)
+            eta_formatted = str(eta_delta)
+
+            logger.info(
+                f"   📥 {self.filename}: {percent:.1f}% "
+                f"({self.downloaded / (1024*1024):.1f}/{self.total_size / (1024*1024):.1f} MB) "
+                f"@ {speed_mbps:.2f} MB/s - ETA: {eta_formatted}"
+            )
+    
+    def complete(self):
+        """Log final completion."""
+        elapsed = time.time() - self.start_time
+        speed_mbps = (self.total_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+        logger.info(
+            f"   ✅ {self.filename}: {self.total_size / (1024*1024):.1f} MB "
+            f"in {elapsed:.1f}s (avg {speed_mbps:.2f} MB/s)"
+        )
 
 def _worker_log_config(log_queue: Queue) -> None:
     """Configure logging for a worker process to send logs to a queue."""
@@ -26,7 +86,43 @@ def _worker_log_config(log_queue: Queue) -> None:
     root_logger = logging.getLogger()
     root_logger.addHandler(queue_handler)
     root_logger.setLevel(logging.INFO)
+    
+    # Suppress noisy S3Handler initialization logs in workers
+    # This must be done AFTER creating the handler
+    logging.getLogger('sftk.s3_handler').setLevel(logging.WARNING)
+    logging.getLogger('s3_handler').setLevel(logging.WARNING)  # Try both module names
+    
+    # Suppress noisy S3Handler initialization logs in workers
+    s3_logger = logging.getLogger('sftk.s3_handler')
+    s3_logger.setLevel(logging.WARNING)  # Only show warnings and errors from S3Handler
 
+
+def _download_with_timeout(s3_handler, key: str, local_path: str, s3_size: int, timeout: int = 3600) -> bool:
+    """Wrapper to download with progress tracking and timeout protection."""
+    try:
+        filename = Path(key).name
+        logger.info(f"[DOWNLOAD-START] {filename} ({s3_size / (1024*1024):.1f} MB)")
+        
+        # Create progress tracker
+        progress = ProgressTracker(filename, s3_size, log_interval=10.0)
+        
+        # Download with progress callback
+        result = s3_handler.download_object_from_s3(
+            key, 
+            local_path, 
+            callback=progress
+        )
+        
+        if result:
+            progress.complete()
+        else:
+            logger.error(f"[DOWNLOAD-FAILED] {filename}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"[DOWNLOAD-ERROR] {Path(key).name}: {e}")
+        return False
 
 def _should_download_file(local_path: Path, s3_size: int, tolerance: float = 0.01) -> bool:
     """
@@ -79,16 +175,13 @@ def _process_single_drop(
     """
     Process a single drop's worth of videos.
     """
-    # Log immediately to confirm worker started
-    drop_id = drop_data_dict.get('drop_id', 'UNKNOWN')
-    print(f"[WORKER START] Processing {drop_id}", flush=True)
-    
     if log_queue:
         _worker_log_config(log_queue)
     
     # Get logger AFTER configuring it
     process_logger = logging.getLogger(__name__)
     
+    drop_id = drop_data_dict.get('drop_id', 'UNKNOWN')
     keys = drop_data_dict['keys']
     sizes = drop_data_dict['sizes']
     survey_id = drop_data_dict['survey_id']
@@ -98,11 +191,14 @@ def _process_single_drop(
     process_logger.info(f"   Files to process: {len(keys)}")
     process_logger.info(f"{'='*60}")
     
+    # Suppress S3Handler logging before creating it
+    logging.getLogger('sftk.s3_handler').setLevel(logging.WARNING)
+    logging.getLogger('s3_handler').setLevel(logging.WARNING)
+    
     # Create S3Handler in worker process (unavoidable for multiprocessing)
-    # But only log it at debug level
     from sftk.s3_handler import S3Handler
     s3_handler = S3Handler()
-    process_logger.debug(f"S3Handler initialized for worker processing {drop_id}")
+    process_logger.debug(f"Initialized S3Handler for {drop_id}")
     
     downloaded_files = []
     output_path = None
@@ -127,24 +223,50 @@ def _process_single_drop(
                     continue
 
                 files_to_download += 1
+                print(f"[DOWNLOAD] Submitting: {Path(key).name} ({s3_size / (1024*1024):.1f} MB)", flush=True)
                 future = executor.submit(
-                    s3_handler.download_object_from_s3, key, str(local_path)
+                    _download_with_timeout, 
+                    s3_handler, 
+                    key, 
+                    str(local_path),
+                    s3_size,  # Pass size for progress tracking
+                    3600      # timeout
                 )
-                futures[future] = (key, local_path)
+
+                futures[future] = (key, local_path, time.time())  # Add start time
 
             if files_to_download > 0:
                 process_logger.info(f"⬇ Downloading {files_to_download} file(s) in parallel...")
+                print(f"DEBUG: About to wait for {len(futures)} futures", flush=True)
+                import sys
+                sys.stdout.flush()
             
-            for future in as_completed(futures):
-                key, local_path = futures[future]
+            completed = 0
+            for future in as_completed(futures, timeout=3600):  # 1 hour timeout for all downloads
+                print(f"DEBUG: Got completed future!", flush=True)
+                key, local_path, start_time = futures[future]
+                completed += 1
+                print(f"[DOWNLOAD] Completed {completed}/{files_to_download}: {local_path.name}", flush=True)
                 try:
-                    if future.result():
+                    result = future.result()
+                    print(f"[DOWNLOAD] Result for {local_path.name}: {result}", flush=True)
+                    if result:
                         downloaded_files_local.append(local_path)
-                        process_logger.info(f"✓ Downloaded: {local_path.name}")
+                        elapsed = time.time() - start_time
+                        file_size_mb = local_path.stat().st_size / (1024 * 1024) if local_path.exists() else 0
+                        process_logger.info(
+                            f"✓ Downloaded: {local_path.name} ({file_size_mb:.1f} MB in {elapsed:.1f}s) "
+                            f"[{completed}/{files_to_download}]"
+                        )
                     else:
-                        process_logger.error(f"✗ Download failed for {key}")
+                        process_logger.error(f"✗ Download failed for {Path(key).name} (returned False)")
+                        print(f"[DOWNLOAD] FAILED: {Path(key).name}", flush=True)
+                except TimeoutError as e:
+                    process_logger.error(f"✗ Download timeout for {Path(key).name}")
+                    print(f"[DOWNLOAD] TIMEOUT: {Path(key).name}", flush=True)
                 except Exception as e:
-                    process_logger.error(f"✗ Download failed for {key}: {e}")
+                    process_logger.error(f"✗ Download exception for {Path(key).name}: {e}")
+                    print(f"[DOWNLOAD] EXCEPTION for {Path(key).name}: {e}", flush=True)
         
         return sorted(downloaded_files_local)
 
@@ -176,6 +298,7 @@ def _process_single_drop(
             if files_to_download > 0:
                 process_logger.info(f"⬇ Downloading {files_to_download} file(s) sequentially...")
             
+            completed = 0
             for key, s3_size in keys_with_sizes:
                 local_path = drop_download_dir / Path(key).name
                 
@@ -184,11 +307,18 @@ def _process_single_drop(
                     downloaded_files.append(local_path)
                     continue
                 
+                completed += 1
+                start_time = time.time()
                 if s3_handler.download_object_from_s3(key, str(local_path)):
                     downloaded_files.append(local_path)
-                    process_logger.info(f"✓ Downloaded: {local_path.name}")
+                    elapsed = time.time() - start_time
+                    file_size_mb = local_path.stat().st_size / (1024 * 1024) if local_path.exists() else 0
+                    process_logger.info(
+                        f"✓ Downloaded: {local_path.name} ({file_size_mb:.1f} MB in {elapsed:.1f}s) "
+                        f"[{completed}/{files_to_download}]"
+                    )
                 else:
-                    process_logger.error(f"✗ Sequential download failed for {key}")
+                    process_logger.error(f"✗ Sequential download failed for {Path(key).name}")
             
             downloaded_files = sorted(downloaded_files)
 
@@ -257,20 +387,24 @@ class VideoProcessor:
         gopro_prefix: str = "GX",
         delete_originals: bool = False,
         test_mode: bool = True,
-        max_workers: int = 4,
-        parallel_drops: bool = True,
-        sequential_download: bool = True,
-        _skip_init_logs: bool = False,  # Internal flag to avoid log spam in workers
+        download_threads: int = 4,  # Threads for downloading files within a drop
+        parallel_drops: int = 3,     # Number of drops to process simultaneously
+        sequential_download: bool = False,
+        _skip_init_logs: bool = False,
     ):
         self.s3_handler = s3_handler
         self.prefix = prefix.strip()
         self.gopro_prefix = gopro_prefix
         self.delete_originals = delete_originals
         self.test_mode = test_mode
-        self.max_workers = max_workers
+        self.download_threads = download_threads 
         self.parallel_drops = parallel_drops
         self.sequential_download = sequential_download
         self._skip_init_logs = _skip_init_logs  # Store the flag
+        
+        # Suppress S3Handler logs in worker processes
+        if _skip_init_logs:
+            logging.getLogger('sftk.s3_handler').setLevel(logging.WARNING)
 
         if not _skip_init_logs:
             logger.info(f"{'='*80}")
@@ -280,7 +414,7 @@ class VideoProcessor:
             logger.info(f"   GoPro prefix: '{gopro_prefix}'")
             logger.info(f"   Test mode: {test_mode}")
             logger.info(f"   Parallel drops: {parallel_drops}")
-            logger.info(f"   Max workers: {max_workers}")
+            logger.info(f"   Download threads: {download_threads}")
             logger.info(f"   Sequential download: {sequential_download}")
             logger.info(f"   Delete originals: {delete_originals}")
             logger.info(f"{'='*80}")
@@ -704,7 +838,7 @@ class VideoProcessor:
         log_listener = None
         manager = None
         
-        if self.parallel_drops:
+        if self.parallel_drops > 1:
             manager = Manager()
             log_queue = manager.Queue(-1)
             log_listener = QueueListener(log_queue, logging.StreamHandler())
@@ -714,21 +848,13 @@ class VideoProcessor:
         successful = 0
         failed = 0
         
-        logger.info(f"🚀 Starting parallel processing with {self.max_workers} workers...\n")
+        logger.info(f"🚀 Starting parallel processing with {self.parallel_drops} drops...\n")
 
         try:
-            if self.parallel_drops:
-                with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            if self.parallel_drops > 1:
+                with ProcessPoolExecutor(max_workers=self.parallel_drops) as executor:
                     futures_to_drop_id = {}
-                    submitted_drops = set()  # Track which drops have been submitted
-                    
                     for drop_id, drop_dict in valid_drops:
-                        # Extra safety: don't submit if already submitted
-                        if drop_id in submitted_drops:
-                            logger.error(f"❌ Prevented duplicate submission of {drop_id}")
-                            continue
-                        
-                        logger.debug(f"📤 Submitting {drop_id} to executor...")
                         future = executor.submit(
                             _process_single_drop,
                             drop_dict,
@@ -736,13 +862,12 @@ class VideoProcessor:
                             str(self.output_dir),
                             self.delete_originals,
                             self.test_mode,
-                            self.max_workers,
+                            self.download_threads,  # Updated variable name
                             self.sequential_download,
                             self.s3_handler.bucket,
                             log_queue,
                         )
                         futures_to_drop_id[future] = drop_id
-                        submitted_drops.add(drop_id)
                     
                     logger.info(f"✅ Submitted {len(futures_to_drop_id)} task(s) to executor\n")
                     
@@ -770,7 +895,7 @@ class VideoProcessor:
                             str(self.output_dir),
                             self.delete_originals,
                             self.test_mode,
-                            self.max_workers,
+                            self.download_threads,
                             self.sequential_download,
                             self.s3_handler.bucket,  # Pass bucket name
                             None,
