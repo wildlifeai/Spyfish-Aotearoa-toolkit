@@ -480,12 +480,28 @@ class VideoProcessor:
         new_key = f"media/{survey_id}/{drop_id}/{drop_id}.mp4"
 
         logger.info(f"⬆️  Uploading to S3: {new_key}")
+        # Get file size for progress tracking
+        file_size = output_path.stat().st_size
+        
+        # Create progress tracker for upload
+        upload_progress = ProgressTracker(
+            filename=output_path.name,
+            total_size=file_size,
+            log_interval=10.0
+        )
+        
         upload_start = time.time()
-        self.s3_handler.upload_file_to_s3(str(output_path), new_key)
+        self.s3_handler.upload_file_to_s3(
+            str(output_path), 
+            new_key,
+            callback=upload_progress
+        )
         upload_time = time.time() - upload_start
         
-        # Get file size for logging
-        file_size_mb = output_path.stat().st_size / (1024 * 1024)
+        # Log completion
+        upload_progress.complete()
+        
+        file_size_mb = file_size / (1024 * 1024)
         logger.info(f"✅ Successfully uploaded {file_size_mb:.2f} MB in {upload_time:.2f}s to: {new_key}")
 
         # Log the delete_originals setting for debugging
