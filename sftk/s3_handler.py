@@ -22,16 +22,17 @@ Dependencies:
 import io
 import logging
 import mimetypes
+import datetime
 import os
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 import boto3
 import pandas as pd
-from botocore.exceptions import BotoCoreError
-from tqdm import tqdm
+from botocore.exceptions import BotoCoreError, ClientError
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
 from sftk.utils import (
@@ -45,6 +46,66 @@ class S3FileNotFoundError(Exception):
     """Custom exception for S3 file not found scenarios."""
 
     pass
+
+
+class ProgressTracker:
+    """Thread-safe progress tracker for S3 transfers."""
+
+    def __init__(self, filename: str, total_size: int, log_interval: float = 10.0):
+        """
+        Initialize progress tracker.
+
+        Args:
+            filename: Name of file being transferred
+            total_size: Total size in bytes
+            log_interval: Seconds between progress logs (default 10s)
+        """
+        self.filename = filename
+        self.total_size = total_size
+        self.transferred = 0
+        self.lock = threading.Lock()
+        self.start_time = time.time()
+        self.last_log_time = time.time()
+        self.log_interval = log_interval
+
+    def __call__(self, bytes_amount: int):
+        """Callback called by boto3 during transfer."""
+        with self.lock:
+            self.transferred += bytes_amount
+            current_time = time.time()
+
+            # Only log periodically to avoid spam
+            if current_time - self.last_log_time >= self.log_interval:
+                self._log_progress()
+                self.last_log_time = current_time
+
+    def _log_progress(self):
+        """Log current progress."""
+        if self.total_size > 0:
+            percent = (self.transferred / self.total_size) * 100
+            elapsed = time.time() - self.start_time
+            speed_mbps = (self.transferred / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+            eta_seconds = ((self.total_size - self.transferred) / (self.transferred / elapsed)) if self.transferred > 0 and elapsed > 0 else 0
+            # 1. Calculate the timedelta object
+            eta_delta = datetime.timedelta(seconds=max(0, eta_seconds))
+            # 2. Format the timedelta object into HH:MM:SS string
+            # This converts the delta to H:MM:SS format (e.g., 1:05:30)
+            eta_formatted = str(eta_delta)
+
+            logging.info(
+                f"   📥 {self.filename}: {percent:.1f}% "
+                f"({self.transferred / (1024*1024):.1f}/{self.total_size / (1024*1024):.1f} MB) "
+                f"@ {speed_mbps:.2f} MB/s - ETA: {eta_formatted}"
+            )
+
+    def complete(self):
+        """Log final completion."""
+        elapsed = time.time() - self.start_time
+        speed_mbps = (self.total_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+        logging.info(
+            f"   ✅ {self.filename}: {self.total_size / (1024*1024):.1f} MB "
+            f"in {elapsed:.1f}s (avg {speed_mbps:.2f} MB/s)"
+        )
 
 
 @dataclass
@@ -185,7 +246,11 @@ class S3Handler:
             if version_id:
                 kwargs["VersionId"] = version_id
 
-            object_size = self.s3.head_object(**kwargs)["ContentLength"]
+            try:
+                object_size = self.s3.head_object(**kwargs)["ContentLength"]
+            except ClientError as e:
+                logging.error(f"Could not get size for {key}: {e}")
+                return False
 
             # Configure transfer for better performance with large files
             config = TransferConfig(
@@ -207,22 +272,15 @@ class S3Handler:
                 )
             else:
                 # Use tqdm progress bar (for interactive/sequential downloads)
-                def progress_update(bytes_transferred):
-                    pbar.update(bytes_transferred)
-
-                with tqdm(
-                    total=object_size, 
-                    unit="B", 
-                    unit_scale=True, 
-                    desc=Path(filename).name
-                ) as pbar:
-                    self.s3.download_file(
-                        Bucket=self.bucket,
-                        Key=key,
-                        Filename=filename,
-                        Callback=progress_update,
-                        Config=config
-                    )
+                progress = ProgressTracker(Path(filename).name, object_size)
+                self.s3.download_file(
+                    Bucket=self.bucket,
+                    Key=key,
+                    Filename=filename,
+                    Callback=progress,
+                    Config=config
+                )
+                progress.complete()
             
             return True
             
@@ -264,6 +322,7 @@ class S3Handler:
         self,
         filename: str,
         key: str,
+        callback=None,
         delete_file_after_upload=False,
         content_type: Optional[str] = None
     ) -> bool:
@@ -273,6 +332,7 @@ class S3Handler:
         Args:
             filename (str): The local filename to upload.
             key (str): The S3 object key.
+            callback: Optional callback function for progress tracking.
             delete_file_after_upload (bool): If True, deletes the local file after a successful upload.
             content_type (Optional[str]): The content type of the file. If not provided, it's guessed.
 
@@ -292,26 +352,30 @@ class S3Handler:
         else:
             ct, _ = mimetypes.guess_type(filename)
             content_args = {"ContentType": ct or "application/octet-stream"}
+        
         try:
-            with tqdm(
-                total=os.path.getsize(filename),
-                unit="B",
-                unit_scale=True,
-                desc=f"Uploading {filename}",
-            ) as pbar:
+            file_size = os.path.getsize(filename)
+            if callback:
                 self.s3.upload_file(
                     Filename=filename,
                     Bucket=self.bucket,
                     Key=key,
                     ExtraArgs=content_args,
-                    Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
+                    Callback=callback,
                 )
+            else:
+                progress = ProgressTracker(Path(filename).name, file_size)
+                self.s3.upload_file(
+                    Filename=filename,
+                    Bucket=self.bucket,
+                    Key=key,
+                    ExtraArgs=content_args,
+                    Callback=progress,
+                )
+                progress.complete()
 
             logging.info("Successfully uploaded file %s to S3", filename)
             return True
-        except BotoCoreError as e:
-            logging.error("Failed to upload file %s to S3: %s", filename, str(e))
-            return False
         finally:
             if delete_file_after_upload:
                 delete_file(filename)

@@ -9,76 +9,16 @@ import subprocess
 import tempfile
 import time
 import threading
-import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
 
-from sftk.s3_handler import S3Handler
+from sftk.s3_handler import ProgressTracker, S3Handler
 from sftk.common import S3_BUCKET
 
 logger = logging.getLogger(__name__)
-
-class ProgressTracker:
-    """Thread-safe progress tracker for S3 downloads."""
-    
-    def __init__(self, filename: str, total_size: int, log_interval: float = 10.0):
-        """
-        Initialize progress tracker.
-        
-        Args:
-            filename: Name of file being downloaded
-            total_size: Total size in bytes
-            log_interval: Seconds between progress logs (default 10s)
-        """
-        self.filename = filename
-        self.total_size = total_size
-        self.downloaded = 0
-        self.lock = threading.Lock()
-        self.start_time = time.time()
-        self.last_log_time = time.time()
-        self.log_interval = log_interval
-        
-    def __call__(self, bytes_amount: int):
-        """Callback called by boto3 during download."""
-        with self.lock:
-            self.downloaded += bytes_amount
-            current_time = time.time()
-            
-            # Only log periodically to avoid spam
-            if current_time - self.last_log_time >= self.log_interval:
-                self._log_progress()
-                self.last_log_time = current_time
-    
-    def _log_progress(self):
-        """Log current progress."""
-        if self.total_size > 0:
-            percent = (self.downloaded / self.total_size) * 100
-            elapsed = time.time() - self.start_time
-            speed_mbps = (self.downloaded / (1024 * 1024)) / elapsed if elapsed > 0 else 0
-            eta_seconds = ((self.total_size - self.downloaded) / (self.downloaded / elapsed)) if self.downloaded > 0 and elapsed > 0 else 0
-            # 1. Calculate the timedelta object
-            eta_delta = datetime.timedelta(seconds=max(0, eta_seconds))
-            # 2. Format the timedelta object into HH:MM:SS string
-            # This converts the delta to H:MM:SS format (e.g., 1:05:30)
-            eta_formatted = str(eta_delta)
-
-            logger.info(
-                f"   📥 {self.filename}: {percent:.1f}% "
-                f"({self.downloaded / (1024*1024):.1f}/{self.total_size / (1024*1024):.1f} MB) "
-                f"@ {speed_mbps:.2f} MB/s - ETA: {eta_formatted}"
-            )
-    
-    def complete(self):
-        """Log final completion."""
-        elapsed = time.time() - self.start_time
-        speed_mbps = (self.total_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
-        logger.info(
-            f"   ✅ {self.filename}: {self.total_size / (1024*1024):.1f} MB "
-            f"in {elapsed:.1f}s (avg {speed_mbps:.2f} MB/s)"
-        )
 
 def _worker_log_config(log_queue: Queue) -> None:
     """Configure logging for a worker process to send logs to a queue."""
@@ -494,7 +434,7 @@ class VideoProcessor:
         self.s3_handler.upload_file_to_s3(
             str(output_path), 
             new_key,
-            callback=upload_progress
+            callback=upload_progress,
         )
         upload_time = time.time() - upload_start
         
