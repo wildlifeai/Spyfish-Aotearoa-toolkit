@@ -517,12 +517,24 @@ class VideoProcessor:
             logger.warning(f"⚠ GP-Fixer repair failed: {e}")
             return None
             
+    
     def _try_repair_with_partial_recovery(
         self, corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
     ) -> Optional[Path]:
-        """Extract moov atom from reference and prepend to corrupted file."""
+        """
+        Attempt to recover corrupted video by re-encoding with metadata from a valid reference.
+        
+        This method uses ffmpeg to:
+        1. Find a valid reference video from the same drop
+        2. Copy codec settings and metadata from the reference
+        3. Re-encode the corrupted video with these settings
+        
+        This is slower than other repair methods but more reliable when the video
+        stream is intact but container metadata is corrupted.
+        """
         repaired_path = temp_dir / f"recovered_{corrupted_path.name}"
         
+        # Find a valid reference video from the same drop
         reference_video = None
         for path in all_video_paths:
             if path != corrupted_path and self.verify_video_file_deep(path):
@@ -530,23 +542,145 @@ class VideoProcessor:
                 break
         
         if not reference_video:
-            logger.warning("⚠ No reference video found for partial recovery")
+            logger.warning("⚠️ No reference video found for partial recovery")
             return None
         
         try:
-            logger.info(f"🔧 Attempting partial recovery with MP4Box...")
-            # Extract moov atom from reference using MP4Box
-            cmd = [
-                "MP4Box", "-raw", "1", str(reference_video),
-                "-out", str(temp_dir / "moov.dat")
-            ]
-            subprocess.run(cmd, capture_output=True, check=True, timeout=60)
+            logger.info(f"🔧 Attempting partial recovery using reference: {reference_video.name}")
             
-            # Note: This is a placeholder - real implementation would be more complex
+            # Strategy 1: Try copying the video stream without re-encoding
+            # This is faster and preserves quality if the stream is valid
+            logger.info("   Attempt 1: Stream copy with metadata recovery...")
+            cmd = [
+                self.ffmpeg_path,
+                "-y",
+                "-i", str(corrupted_path),
+                "-c", "copy",  # Copy without re-encoding
+                "-movflags", "+faststart",  # Optimize for streaming
+                "-f", "mp4",
+                str(repaired_path)
+            ]
+            
+            result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True,
+                timeout=300
+            )
+            
+            if result.returncode == 0 and repaired_path.exists():
+                if self.verify_video_file_deep(repaired_path):
+                    logger.info("✅ Partial recovery successful (stream copy)!")
+                    return repaired_path
+                else:
+                    logger.debug("   Stream copy produced invalid output, trying re-encode...")
+                    if repaired_path.exists():
+                        repaired_path.unlink()
+            
+            # Strategy 2: Re-encode with codec settings from reference
+            # This is slower but more robust
+            logger.info("   Attempt 2: Full re-encode with reference settings...")
+            
+            # Get codec information from reference video
+            probe_cmd = [
+                "ffprobe",
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_streams",
+                "-select_streams", "v:0",
+                str(reference_video)
+            ]
+            
+            probe_result = subprocess.run(
+                probe_cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            # Extract codec parameters
+            codec_params = {}
+            if probe_result.returncode == 0:
+                try:
+                    probe_data = json.loads(probe_result.stdout)
+                    if "streams" in probe_data and len(probe_data["streams"]) > 0:
+                        stream = probe_data["streams"][0]
+                        codec_params["codec"] = stream.get("codec_name", "libx264")
+                        codec_params["width"] = stream.get("width")
+                        codec_params["height"] = stream.get("height")
+                        codec_params["pix_fmt"] = stream.get("pix_fmt", "yuv420p")
+                        
+                        # Extract frame rate
+                        r_frame_rate = stream.get("r_frame_rate", "30/1")
+                        try:
+                            num, den = map(int, r_frame_rate.split("/"))
+                            codec_params["fps"] = num / den if den != 0 else 30
+                        except (ValueError, ZeroDivisionError):
+                            codec_params["fps"] = 30
+                except json.JSONDecodeError:
+                    logger.warning("   Could not parse reference codec info, using defaults")
+            
+            # Build re-encode command with reference parameters
+            reencode_cmd = [
+                self.ffmpeg_path,
+                "-y",
+                "-i", str(corrupted_path),
+                "-c:v", codec_params.get("codec", "libx264"),
+                "-preset", "fast",  # Balance speed and quality
+                "-crf", "23",  # Reasonable quality
+                "-pix_fmt", codec_params.get("pix_fmt", "yuv420p"),
+            ]
+            
+            # Add frame rate if available
+            if "fps" in codec_params:
+                reencode_cmd.extend(["-r", str(codec_params["fps"])])
+            
+            # Add resolution if available
+            if "width" in codec_params and "height" in codec_params:
+                reencode_cmd.extend([
+                    "-s", f"{codec_params['width']}x{codec_params['height']}"
+                ])
+            
+            # Copy audio without re-encoding
+            reencode_cmd.extend([
+                "-c:a", "copy",
+                "-movflags", "+faststart",
+                str(repaired_path)
+            ])
+            
+            logger.info(f"   Re-encoding with: {codec_params.get('codec', 'libx264')}, "
+                       f"{codec_params.get('width', '?')}x{codec_params.get('height', '?')}, "
+                       f"{codec_params.get('fps', '?')} fps")
+            
+            reencode_result = subprocess.run(
+                reencode_cmd,
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 minute timeout for re-encoding
+            )
+            
+            if reencode_result.returncode == 0 and repaired_path.exists():
+                if self.verify_video_file_deep(repaired_path):
+                    logger.info("✅ Partial recovery successful (re-encode)!")
+                    return repaired_path
+                else:
+                    logger.warning("   Re-encode produced invalid output")
+            else:
+                stderr_preview = reencode_result.stderr[:500] if reencode_result.stderr else "No error output"
+                logger.warning(f"   Re-encode failed: {stderr_preview}")
+            
+            return None
+            
+        except subprocess.TimeoutExpired:
+            logger.warning("⚠️ Partial recovery timed out")
             return None
         except Exception as e:
-            logger.warning(f"⚠ Partial recovery failed: {e}")
+            logger.warning(f"⚠️ Partial recovery failed: {e}")
             return None
+        finally:
+            # Clean up failed attempts
+            if repaired_path.exists() and not self.verify_video_file_deep(repaired_path):
+                repaired_path.unlink()
             
     def _try_repair_with_untrunc(
         self, corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
