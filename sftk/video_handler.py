@@ -451,7 +451,7 @@ def _process_single_drop(
                     continue
 
                 files_to_download += 1
-                print(f"[DOWNLOAD] Submitting: {Path(key).name} ({s3_size / (1024*1024):.1f} MB)", flush=True)
+                process_logger.debug(f"[DOWNLOAD] Submitting: {Path(key).name} ({s3_size / (1024*1024):.1f} MB)")
                 future = executor.submit(
                     _download_with_timeout, 
                     s3_handler, 
