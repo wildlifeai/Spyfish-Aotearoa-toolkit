@@ -20,6 +20,20 @@ from sftk.common import S3_BUCKET
 
 logger = logging.getLogger(__name__)
 
+
+def _find_ffmpeg() -> Optional[str]:
+    """Find ffmpeg executable."""
+    if shutil.which("ffmpeg"):
+        return "ffmpeg"
+    possible_paths = [
+        Path.cwd() / "ffmpeg.exe",
+        Path.cwd() / "bin" / "ffmpeg.exe",
+    ]
+    for path in possible_paths:
+        if path.exists():
+            return str(path)
+    return None
+
 def _worker_log_config(log_queue: Queue) -> None:
     """Configure logging for a worker process to send logs to a queue."""
     queue_handler = QueueHandler(log_queue)
@@ -100,6 +114,279 @@ def _should_download_file(local_path: Path, s3_size: int, tolerance: float = 0.0
     
     return True
 
+def _verify_video_file_deep(file_path: Path) -> bool:
+    """Deep verification using ffprobe."""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
+            str(file_path),
+        ]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, check=True
+        )
+        data = json.loads(result.stdout)
+        if "format" in data and "streams" in data:
+            logger.debug(f"✓ Video file verified: {file_path.name}")
+            return True
+        logger.error(f"✗ Invalid video format for {file_path.name}")
+        return False
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+        Exception,
+    ) as e:
+        logger.error(f"✗ Error verifying video file {file_path.name}: {e}")
+        return False
+
+def _try_repair_with_untrunc(
+    corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
+) -> Optional[Path]:
+    """Repair using untrunc - excellent for missing moov atoms."""
+    repaired_path = temp_dir / f"untrunc_{corrupted_path.name}"
+    
+    # Find a valid reference video from the same drop
+    reference_video = None
+    for path in all_video_paths:
+        if path != corrupted_path and _verify_video_file_deep(path):
+            reference_video = path
+            break
+    
+    if not reference_video:
+        logger.error("✗ No reference video found for untrunc repair")
+        return None
+    
+    try:
+        logger.info(f"🔧 Attempting untrunc repair...")
+        cmd = ["untrunc", str(reference_video), str(corrupted_path)]
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
+        
+        # untrunc creates a file with _fixed suffix
+        fixed_file = corrupted_path.parent / f"{corrupted_path.stem}_fixed{corrupted_path.suffix}"
+        if fixed_file.exists():
+            shutil.move(str(fixed_file), str(repaired_path))
+            if _verify_video_file_deep(repaired_path):
+                logger.info(f"✅ untrunc repair successful!")
+                return repaired_path
+        
+        logger.warning("⚠ untrunc ran but did not produce a valid output")
+        return None
+    except Exception as e:
+        logger.warning(f"⚠ untrunc repair failed: {e}")
+        return None
+
+def _try_repair_video(
+    corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
+) -> Optional[Path]:
+    """Attempts to repair a corrupted video file using multiple strategies."""
+    logger.warning(f"⚠ Video file corrupted: {corrupted_path.name}")
+    
+    # Strategy 1: untrunc (best for missing moov atom)
+    if shutil.which("untrunc"):
+        repaired = _try_repair_with_untrunc(corrupted_path, temp_dir, all_video_paths)
+        if repaired:
+            return repaired
+    
+    # Other strategies could be added here
+    
+    logger.error(f"❌ All repair strategies failed for {corrupted_path.name}")
+    return None
+
+def _concatenate_videos(video_paths: List[Path], output_path: Path, ffmpeg_path: str) -> tuple[bool, str]:
+    """Concatenate multiple videos, attempting to repair any corrupted files first."""
+    if not video_paths:
+        error_msg = "No video paths provided for concatenation."
+        logger.error(f"❌ {error_msg}")
+        return False, error_msg
+
+    list_file = None
+    temp_dir = Path(tempfile.mkdtemp(prefix="video_repair_"))
+
+    try:
+        videos_to_concat = []
+        needs_repair = []
+        
+        # First pass: identify files needing repair
+        for path in video_paths:
+            if not path.exists():
+                error_msg = f"Input file '{path.name}' does not exist."
+                logger.error(f"❌ {error_msg}")
+                return False, error_msg
+                
+            if path.stat().st_size == 0:
+                error_msg = f"Input file '{path.name}' is empty (0 bytes)."
+                logger.error(f"❌ {error_msg}")
+                return False, error_msg
+
+            if _verify_video_file_deep(path):
+                videos_to_concat.append(path)
+            else:
+                needs_repair.append(path)
+        
+        # Second pass: attempt repairs
+        if needs_repair:
+            logger.warning(f"⚠ {len(needs_repair)} file(s) need repair")
+            for corrupted_path in needs_repair:
+                repaired_path = _try_repair_video(corrupted_path, temp_dir, video_paths)
+                if repaired_path:
+                    videos_to_concat.append(repaired_path)
+                else:
+                    error_msg = f"Could not repair '{corrupted_path.name}'. Aborting concatenation."
+                    logger.critical(f"❌ {error_msg}")
+                    return False, error_msg
+
+        if not videos_to_concat:
+            error_msg = "No valid videos available to concatenate after verification/repair."
+            logger.error(f"❌ {error_msg}")
+            return False, error_msg
+
+        # Store file list in temp directory
+        list_file = temp_dir / "file_list.txt"
+        with open(list_file, "w", encoding="utf-8") as f:
+            for path in videos_to_concat:
+                line = f"file '{path.resolve().as_posix()}'\n"
+                f.write(line)
+
+        cmd = [
+            ffmpeg_path,
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(list_file),
+            "-c",
+            "copy",
+            str(output_path),
+        ]
+
+        start_time = time.time()
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8",
+            timeout=3600,
+        )
+        
+        elapsed = time.time() - start_time
+        logger.info(f"✅ Concatenation successful! Took {elapsed:.2f} seconds")
+
+        if not output_path.exists() or output_path.stat().st_size == 0:
+            error_msg = f"Output file '{output_path.name}' is missing or empty after concatenation."
+            logger.error(f"❌ {error_msg}")
+            return False, error_msg
+            
+        return True, "Concatenation successful."
+        
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        stderr = getattr(e, 'stderr', 'N/A')
+        error_msg = (
+            f"CONCATENATION FAILED for {output_path.name}: {e}\n"
+            f"--- FFMPEG STDERR ---\n{stderr}\n--- END FFMPEG STDERR ---"
+        )
+        logger.error(f"❌ {error_msg}")
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error during concatenation: {e}"
+        logger.error(f"❌ {error_msg}")
+        return False, error_msg
+    finally:
+        # Clean up temporary files and directory
+        if list_file and list_file.exists():
+            list_file.unlink()
+        if temp_dir and temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+def _upload_and_cleanup_s3(
+    s3_handler: S3Handler, output_path: Path, upload_data: dict, delete_originals: bool
+) -> None:
+    """Upload concatenated video and delete original parts from S3 if configured."""
+    drop_id = upload_data['DropID']
+    survey_id = upload_data['SurveyID']
+    new_key = f"media/{survey_id}/{drop_id}/{drop_id}.mp4"
+
+    logger.info(f"⬆️  Uploading to S3: {new_key}")
+    file_size = output_path.stat().st_size
+    
+    upload_progress = ProgressTracker(
+        filename=output_path.name,
+        total_size=file_size,
+        log_interval=10.0
+    )
+    
+    s3_handler.upload_file_to_s3(
+        str(output_path), 
+        new_key,
+        callback=upload_progress,
+    )
+    
+    upload_progress.complete()
+    
+    if delete_originals:
+        logger.info(f"🗑️  Deleting {len(upload_data['Key'])} original file(s) from S3...")
+        deleted_count = 0
+        failed_count = 0
+        for key in upload_data['Key']:
+            try:
+                s3_handler.s3.delete_object(Bucket=s3_handler.bucket, Key=key)
+                deleted_count += 1
+                logger.info(f"   ✓ Deleted from S3: {Path(key).name}")
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"   ✗ Failed to delete {Path(key).name}: {e}")
+        
+        if failed_count > 0:
+            logger.warning(f"⚠ Deleted {deleted_count}/{len(upload_data['Key'])} files ({failed_count} failed)")
+        else:
+            logger.info(f"✅ Successfully deleted all {deleted_count} original files from S3")
+    else:
+        logger.info(f"ℹ️  Keeping original files in S3 (delete_originals=False)")
+
+def _cleanup_local_files(
+    downloaded_files: List[Path],
+    output_path: Optional[Path],
+    drop_specific_download_dir: Optional[Path],
+    drop_id: str,
+    test_mode: bool
+) -> None:
+    """Clean up local files after processing."""
+    if not test_mode:
+        logger.info(f"🗑️  Cleaning up local files for {drop_id}...")
+        deleted_count = 0
+        for file_path in downloaded_files:
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                    deleted_count += 1
+                except Exception as e:
+                    logger.warning(f"   ✗ Could not delete {file_path.name}: {e}")
+        
+        logger.info(f"   Deleted {deleted_count}/{len(downloaded_files)} local video file(s)")
+        
+        if drop_specific_download_dir and drop_specific_download_dir.exists():
+            try:
+                drop_specific_download_dir.rmdir()
+                logger.info(f"   ✓ Removed drop directory: {drop_specific_download_dir.name}")
+            except OSError:
+                logger.debug(f"   Could not remove {drop_specific_download_dir.name} (not empty)")
+    else:
+        logger.info(f"🧪 Test mode: Keeping {len(downloaded_files)} downloaded file(s) for {drop_id}")
+        
+    if output_path and output_path.exists() and not test_mode:
+        try:
+            output_path.unlink()
+            logger.info(f"   ✓ Deleted local output file: {output_path.name}")
+        except Exception as e:
+            logger.warning(f"   ✗ Could not delete output file {output_path.name}: {e}")
 
 def _process_single_drop(
     drop_data_dict: dict,
@@ -110,6 +397,7 @@ def _process_single_drop(
     max_workers: int,
     sequential_download: bool,
     s3_bucket: str,  # Pass bucket name instead of handler
+    ffmpeg_path: str,
     log_queue: Optional[Queue] = None,
 ) -> None:
     """
@@ -275,31 +563,21 @@ def _process_single_drop(
 
         survey_id = drop_data_dict['survey_id']
         
-        # Create temporary VideoProcessor instance for this drop
-        # IMPORTANT: Pass delete_originals from parent to ensure correct behavior
-        temp_processor = VideoProcessor(
-            s3_handler, 
-            test_mode=test_mode,
-            delete_originals=delete_originals,  # Pass through from parent
-            _skip_init_logs=True  # Skip repeated initialization logs
-        )
-        
         process_logger.info(f"🎞️  Concatenating videos into: {output_path.name}")
-        concatenation_success, concatenation_message = temp_processor.concatenate_videos(
-            downloaded_files, output_path
+        concatenation_success, concatenation_message = _concatenate_videos(
+            downloaded_files, output_path, ffmpeg_path
         )
         
         if not concatenation_success:
             raise RuntimeError(f"Video concatenation failed: {concatenation_message}")
 
         if not test_mode:
-            process_logger.info(f"☁️  Uploading concatenated video to S3...")
             upload_data = {
                 'DropID': drop_id,
                 'SurveyID': survey_id,
                 'Key': keys
             }
-            temp_processor._upload_and_cleanup_from_dict(output_path, upload_data)
+            _upload_and_cleanup_s3(s3_handler, output_path, upload_data, delete_originals)
         else:
             process_logger.info(f"🧪 Test mode: Skipping S3 upload for {drop_id}")
             
@@ -307,9 +585,13 @@ def _process_single_drop(
         process_logger.error(f"❌ Failed to process drop {drop_id}: {e}")
         raise
     finally:
-        if 'temp_processor' in locals() and drop_download_dir:
-            temp_processor._cleanup_local_files(
-                downloaded_files, output_path, drop_download_dir, drop_id
+        if drop_download_dir:
+            _cleanup_local_files(
+                downloaded_files,
+                output_path,
+                drop_download_dir,
+                drop_id,
+                test_mode
             )
 
 
@@ -365,492 +647,28 @@ class VideoProcessor:
         self.download_dir.mkdir(exist_ok=True)
         self.output_dir.mkdir(exist_ok=True)
 
-        self.ffmpeg_path = self._find_ffmpeg()
+        self.ffmpeg_path = _find_ffmpeg()
         if not self.ffmpeg_path:
             raise RuntimeError(
                 "ffmpeg not found. Please install ffmpeg and ensure it's in your system's PATH."
             )
-
-        if not _skip_init_logs:
-            # Pre-fetch and filter movies to provide upfront information
-            logger.info(f"🔍 Fetching movie list from S3 with prefix: '{self.prefix}'")
-            self.movies_df = self.get_movies_df(prefix=self.prefix)
-            logger.info(f"📁 Found {len(self.movies_df):,} movie files with the specified prefix")
-            
-            movies_df_with_parts = _add_path_parts_to_df(self.movies_df)
-            self.filtered_df = get_filtered_movies_df(
-                movies_df=movies_df_with_parts.copy(), 
-                gopro_prefix=self.gopro_prefix
-            )
-            
-            # Debug: Check for duplicate Keys in filtered_df
-            if not self.filtered_df.empty:
-                duplicate_keys = self.filtered_df[self.filtered_df.duplicated(subset=['Key'], keep=False)]
-                if not duplicate_keys.empty:
-                    logger.error(f"⚠ WARNING: Found {len(duplicate_keys)} duplicate Keys in filtered_df!")
-                    logger.error(f"   Duplicate Keys: {duplicate_keys['Key'].tolist()}")
-            
-            num_drops = self.filtered_df['DropID'].nunique() if not self.filtered_df.empty else 0
-            logger.info(f"🎬 Found {num_drops} drop(s) that require concatenation")
-            logger.info(f"{'='*80}\n")
-
-    def _find_ffmpeg(self) -> Optional[str]:
-        """Find ffmpeg executable."""
-        if shutil.which("ffmpeg"):
-            if not hasattr(self, '_skip_init_logs') or not self._skip_init_logs:
-                logger.info("✓ Found ffmpeg in PATH")
-            return "ffmpeg"
-
-        possible_paths = [
-            Path.cwd() / "ffmpeg.exe",
-            Path.cwd() / "bin" / "ffmpeg.exe",
-        ]
-        for path in possible_paths:
-            if path.exists():
-                logger.info(f"✓ Found ffmpeg at: {path}")
-                return str(path)
-        return None
-    
-    def _upload_and_cleanup_from_dict(
-        self, output_path: Path, upload_data: dict
-    ) -> None:
-        """Upload concatenated video and delete original parts from S3 if configured."""
-        drop_id = upload_data['DropID']
-        survey_id = upload_data['SurveyID']
-        new_key = f"media/{survey_id}/{drop_id}/{drop_id}.mp4"
-
-        logger.info(f"⬆️  Uploading to S3: {new_key}")
-        # Get file size for progress tracking
-        file_size = output_path.stat().st_size
-        
-        # Create progress tracker for upload
-        upload_progress = ProgressTracker(
-            filename=output_path.name,
-            total_size=file_size,
-            log_interval=10.0
-        )
-        
-        upload_start = time.time()
-        self.s3_handler.upload_file_to_s3(
-            str(output_path), 
-            new_key,
-            callback=upload_progress,
-        )
-        upload_time = time.time() - upload_start
-        
-        # Log completion
-        upload_progress.complete()
-        
-        file_size_mb = file_size / (1024 * 1024)
-        logger.info(f"✅ Successfully uploaded {file_size_mb:.2f} MB in {upload_time:.2f}s to: {new_key}")
-
-        # Log the delete_originals setting for debugging
-        logger.info(f"🔧 delete_originals setting: {self.delete_originals}")
-        
-        if self.delete_originals:
-            logger.info(f"🗑️  Deleting {len(upload_data['Key'])} original file(s) from S3...")
-            deleted_count = 0
-            failed_count = 0
-            for key in upload_data['Key']:
-                try:
-                    self.s3_handler.s3.delete_object(Bucket=self.s3_handler.bucket, Key=key)
-                    deleted_count += 1
-                    logger.info(f"   ✓ Deleted from S3: {Path(key).name}")
-                except Exception as e:
-                    failed_count += 1
-                    logger.error(f"   ✗ Failed to delete {Path(key).name}: {e}")
-            
-            if failed_count > 0:
-                logger.warning(f"⚠ Deleted {deleted_count}/{len(upload_data['Key'])} files ({failed_count} failed)")
-            else:
-                logger.info(f"✅ Successfully deleted all {deleted_count} original files from S3")
         else:
-            logger.info(f"ℹ️  Keeping original files in S3 (delete_originals=False)")
+            logger.info(f"✓ Found ffmpeg at: {self.ffmpeg_path}")
 
-    def verify_video_file_deep(self, file_path: Path) -> bool:
-        """Deep verification using ffprobe."""
-        try:
-            cmd = [
-                "ffprobe",
-                "-v",
-                "quiet",
-                "-print_format",
-                "json",
-                "-show_format",
-                "-show_streams",
-                str(file_path),
-            ]
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=30, check=True
-            )
-            data = json.loads(result.stdout)
-            if "format" in data and "streams" in data:
-                logger.debug(f"✓ Video file verified: {file_path.name}")
-                return True
-            logger.error(f"✗ Invalid video format for {file_path.name}")
-            return False
-        except (
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            json.JSONDecodeError,
-            Exception,
-        ) as e:
-            logger.error(f"✗ Error verifying video file {file_path.name}: {e}")
-            return False
-
-    def _try_repair_with_gpfixer(
-        self, corrupted_path: Path, temp_dir: Path
-    ) -> Optional[Path]:
-        """Use GP-Fixer for GoPro-specific repairs."""
-        repaired_path = temp_dir / f"gpfixed_{corrupted_path.name}"
+        # Pre-fetch and filter movies to provide upfront information
+        logger.info(f"🔍 Fetching movie list from S3 with prefix: '{self.prefix}'")
+        self.movies_df = self.get_movies_df(prefix=self.prefix)
+        logger.info(f"📁 Found {len(self.movies_df):,} movie files with the specified prefix")
         
-        try:
-            logger.info(f"🔧 Attempting GP-Fixer repair...")
-            cmd = ["gpfixer", "-i", str(corrupted_path), "-o", str(repaired_path)]
-            subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
-            
-            if repaired_path.exists() and self.verify_video_file_deep(repaired_path):
-                logger.info(f"✅ GP-Fixer repair successful!")
-                return repaired_path
-            return None
-        except Exception as e:
-            logger.warning(f"⚠ GP-Fixer repair failed: {e}")
-            return None
-            
-    
-    def _try_repair_with_partial_recovery(
-        self, corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
-    ) -> Optional[Path]:
-        """
-        Attempt to recover corrupted video by re-encoding with metadata from a valid reference.
+        movies_df_with_parts = _add_path_parts_to_df(self.movies_df)
+        self.filtered_df = get_filtered_movies_df(
+            movies_df=movies_df_with_parts.copy(), 
+            gopro_prefix=self.gopro_prefix
+        )
         
-        This method uses ffmpeg to:
-        1. Find a valid reference video from the same drop
-        2. Copy codec settings and metadata from the reference
-        3. Re-encode the corrupted video with these settings
-        
-        This is slower than other repair methods but more reliable when the video
-        stream is intact but container metadata is corrupted.
-        """
-        repaired_path = temp_dir / f"recovered_{corrupted_path.name}"
-        
-        # Find a valid reference video from the same drop
-        reference_video = None
-        for path in all_video_paths:
-            if path != corrupted_path and self.verify_video_file_deep(path):
-                reference_video = path
-                break
-        
-        if not reference_video:
-            logger.warning("⚠️ No reference video found for partial recovery")
-            return None
-        
-        try:
-            logger.info(f"🔧 Attempting partial recovery using reference: {reference_video.name}")
-            
-            # Strategy 1: Try copying the video stream without re-encoding
-            # This is faster and preserves quality if the stream is valid
-            logger.info("   Attempt 1: Stream copy with metadata recovery...")
-            cmd = [
-                self.ffmpeg_path,
-                "-y",
-                "-i", str(corrupted_path),
-                "-c", "copy",  # Copy without re-encoding
-                "-movflags", "+faststart",  # Optimize for streaming
-                "-f", "mp4",
-                str(repaired_path)
-            ]
-            
-            result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True,
-                timeout=300
-            )
-            
-            if result.returncode == 0 and repaired_path.exists():
-                if self.verify_video_file_deep(repaired_path):
-                    logger.info("✅ Partial recovery successful (stream copy)!")
-                    return repaired_path
-                else:
-                    logger.debug("   Stream copy produced invalid output, trying re-encode...")
-                    if repaired_path.exists():
-                        repaired_path.unlink()
-            
-            # Strategy 2: Re-encode with codec settings from reference
-            # This is slower but more robust
-            logger.info("   Attempt 2: Full re-encode with reference settings...")
-            
-            # Get codec information from reference video
-            probe_cmd = [
-                "ffprobe",
-                "-v", "quiet",
-                "-print_format", "json",
-                "-show_streams",
-                "-select_streams", "v:0",
-                str(reference_video)
-            ]
-            
-            probe_result = subprocess.run(
-                probe_cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            # Extract codec parameters
-            codec_params = {}
-            if probe_result.returncode == 0:
-                try:
-                    probe_data = json.loads(probe_result.stdout)
-                    if "streams" in probe_data and len(probe_data["streams"]) > 0:
-                        stream = probe_data["streams"][0]
-                        codec_params["codec"] = stream.get("codec_name", "libx264")
-                        codec_params["width"] = stream.get("width")
-                        codec_params["height"] = stream.get("height")
-                        codec_params["pix_fmt"] = stream.get("pix_fmt", "yuv420p")
-                        
-                        # Extract frame rate
-                        r_frame_rate = stream.get("r_frame_rate", "30/1")
-                        try:
-                            num, den = map(int, r_frame_rate.split("/"))
-                            codec_params["fps"] = num / den if den != 0 else 30
-                        except (ValueError, ZeroDivisionError):
-                            codec_params["fps"] = 30
-                except json.JSONDecodeError:
-                    logger.warning("   Could not parse reference codec info, using defaults")
-            
-            # Build re-encode command with reference parameters
-            reencode_cmd = [
-                self.ffmpeg_path,
-                "-y",
-                "-i", str(corrupted_path),
-                "-c:v", codec_params.get("codec", "libx264"),
-                "-preset", "fast",  # Balance speed and quality
-                "-crf", "23",  # Reasonable quality
-                "-pix_fmt", codec_params.get("pix_fmt", "yuv420p"),
-            ]
-            
-            # Add frame rate if available
-            if "fps" in codec_params:
-                reencode_cmd.extend(["-r", str(codec_params["fps"])])
-            
-            # Add resolution if available
-            if "width" in codec_params and "height" in codec_params:
-                reencode_cmd.extend([
-                    "-s", f"{codec_params['width']}x{codec_params['height']}"
-                ])
-            
-            # Copy audio without re-encoding
-            reencode_cmd.extend([
-                "-c:a", "copy",
-                "-movflags", "+faststart",
-                str(repaired_path)
-            ])
-            
-            logger.info(f"   Re-encoding with: {codec_params.get('codec', 'libx264')}, "
-                       f"{codec_params.get('width', '?')}x{codec_params.get('height', '?')}, "
-                       f"{codec_params.get('fps', '?')} fps")
-            
-            reencode_result = subprocess.run(
-                reencode_cmd,
-                capture_output=True,
-                text=True,
-                timeout=600  # 10 minute timeout for re-encoding
-            )
-            
-            if reencode_result.returncode == 0 and repaired_path.exists():
-                if self.verify_video_file_deep(repaired_path):
-                    logger.info("✅ Partial recovery successful (re-encode)!")
-                    return repaired_path
-                else:
-                    logger.warning("   Re-encode produced invalid output")
-            else:
-                stderr_preview = reencode_result.stderr[:500] if reencode_result.stderr else "No error output"
-                logger.warning(f"   Re-encode failed: {stderr_preview}")
-            
-            return None
-            
-        except subprocess.TimeoutExpired:
-            logger.warning("⚠️ Partial recovery timed out")
-            return None
-        except Exception as e:
-            logger.warning(f"⚠️ Partial recovery failed: {e}")
-            return None
-        finally:
-            # Clean up failed attempts
-            if repaired_path.exists() and not self.verify_video_file_deep(repaired_path):
-                repaired_path.unlink()
-            
-    def _try_repair_with_untrunc(
-        self, corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
-    ) -> Optional[Path]:
-        """Repair using untrunc - excellent for missing moov atoms."""
-        repaired_path = temp_dir / f"untrunc_{corrupted_path.name}"
-        
-        # Find a valid reference video from the same drop
-        reference_video = None
-        for path in all_video_paths:
-            if path != corrupted_path and self.verify_video_file_deep(path):
-                reference_video = path
-                break
-        
-        if not reference_video:
-            logger.error("✗ No reference video found for untrunc repair")
-            return None
-        
-        try:
-            logger.info(f"🔧 Attempting untrunc repair...")
-            cmd = ["untrunc", str(reference_video), str(corrupted_path)]
-            subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
-            
-            # untrunc creates a file with _fixed suffix
-            fixed_file = corrupted_path.parent / f"{corrupted_path.stem}_fixed{corrupted_path.suffix}"
-            if fixed_file.exists():
-                shutil.move(str(fixed_file), str(repaired_path))
-                if self.verify_video_file_deep(repaired_path):
-                    logger.info(f"✅ untrunc repair successful!")
-                    return repaired_path
-            
-            logger.warning("⚠ untrunc ran but did not produce a valid output")
-            return None
-        except Exception as e:
-            logger.warning(f"⚠ untrunc repair failed: {e}")
-            return None
-            
-    def _try_repair_video(
-        self, corrupted_path: Path, temp_dir: Path, all_video_paths: List[Path]
-    ) -> Optional[Path]:
-        """Attempts to repair a corrupted video file using multiple strategies."""
-        logger.warning(f"⚠ Video file corrupted: {corrupted_path.name}")
-        
-        # Strategy 1: untrunc (best for missing moov atom)
-        if shutil.which("untrunc"):
-            repaired = self._try_repair_with_untrunc(corrupted_path, temp_dir, all_video_paths)
-            if repaired:
-                return repaired
-        
-        # Strategy 2: GP-Fixer (GoPro-specific)
-        if shutil.which("gpfixer"):
-            repaired = self._try_repair_with_gpfixer(corrupted_path, temp_dir)
-            if repaired:
-                return repaired
-        
-        # Strategy 3: ffmpeg re-encode (slowest, last resort)
-        repaired = self._try_repair_with_partial_recovery(corrupted_path, temp_dir, all_video_paths)
-        if repaired:
-            return repaired
-        
-        logger.error(f"❌ All repair strategies failed for {corrupted_path.name}")
-        return None
-
-    def concatenate_videos(self, video_paths: List[Path], output_path: Path) -> tuple[bool, str]:  # type: ignore
-        """Concatenate multiple videos, attempting to repair any corrupted files first."""
-        if not video_paths:
-            error_msg = "No video paths provided for concatenation."
-            logger.error(f"❌ {error_msg}")
-            return False, error_msg
-
-        list_file = None
-        temp_dir = Path(tempfile.mkdtemp(prefix="video_repair_"))
-
-        try:
-            videos_to_concat = []
-            needs_repair = []
-            
-            # First pass: identify files needing repair
-            for path in video_paths:
-                if not path.exists():
-                    error_msg = f"Input file '{path.name}' does not exist."
-                    logger.error(f"❌ {error_msg}")
-                    return False, error_msg
-                    
-                if path.stat().st_size == 0:
-                    error_msg = f"Input file '{path.name}' is empty (0 bytes)."
-                    logger.error(f"❌ {error_msg}")
-                    return False, error_msg
-
-                if self.verify_video_file_deep(path):
-                    videos_to_concat.append(path)
-                else:
-                    needs_repair.append(path)
-            
-            # Second pass: attempt repairs
-            if needs_repair:
-                logger.warning(f"⚠ {len(needs_repair)} file(s) need repair")
-                for corrupted_path in needs_repair:
-                    repaired_path = self._try_repair_video(corrupted_path, temp_dir, video_paths)
-                    if repaired_path:
-                        videos_to_concat.append(repaired_path)
-                    else:
-                        error_msg = f"Could not repair '{corrupted_path.name}'. Aborting concatenation."
-                        logger.critical(f"❌ {error_msg}")
-                        return False, error_msg
-
-            if not videos_to_concat:
-                error_msg = "No valid videos available to concatenate after verification/repair."
-                logger.error(f"❌ {error_msg}")
-                return False, error_msg
-
-            # Store file list in temp directory
-            list_file = temp_dir / "file_list.txt"
-            with open(list_file, "w", encoding="utf-8") as f:
-                for path in videos_to_concat:
-                    line = f"file '{path.resolve().as_posix()}'\n"
-                    f.write(line)
-
-            cmd = [
-                self.ffmpeg_path,
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(list_file),
-                "-c",
-                "copy",
-                str(output_path),
-            ]
-
-            start_time = time.time()
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True,
-                encoding="utf-8",
-                timeout=3600,
-            )
-            
-            elapsed = time.time() - start_time
-            logger.info(f"✅ Concatenation successful! Took {elapsed:.2f} seconds")
-
-            if not output_path.exists() or output_path.stat().st_size == 0:
-                error_msg = f"Output file '{output_path.name}' is missing or empty after concatenation."
-                logger.error(f"❌ {error_msg}")
-                return False, error_msg
-                
-            return True, "Concatenation successful."
-            
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            stderr = getattr(e, 'stderr', 'N/A')
-            error_msg = (
-                f"CONCATENATION FAILED for {output_path.name}: {e}\n"
-                f"--- FFMPEG STDERR ---\n{stderr}\n--- END FFMPEG STDERR ---"
-            )
-            logger.error(f"❌ {error_msg}")
-            return False, error_msg
-        except Exception as e:
-            error_msg = f"Unexpected error during concatenation: {e}"
-            logger.error(f"❌ {error_msg}")
-            return False, error_msg
-        finally:
-            # Clean up temporary files and directory
-            if list_file and list_file.exists():
-                list_file.unlink()
-            if temp_dir and temp_dir.exists():
-                shutil.rmtree(temp_dir, ignore_errors=True)
+        num_drops = self.filtered_df['DropID'].nunique() if not self.filtered_df.empty else 0
+        logger.info(f"🎬 Found {num_drops} drop(s) that require concatenation")
+        logger.info(f"{'='*80}\n")
 
     def process_gopro_videos(self) -> None:
         """Process GoPro videos by DropID."""
@@ -955,6 +773,7 @@ class VideoProcessor:
                             self.download_threads,  # Updated variable name
                             self.sequential_download,
                             self.s3_handler.bucket,
+                            self.ffmpeg_path,
                             log_queue,
                         )
                         futures_to_drop_id[future] = drop_id
@@ -988,6 +807,7 @@ class VideoProcessor:
                             self.download_threads,
                             self.sequential_download,
                             self.s3_handler.bucket,  # Pass bucket name
+                            self.ffmpeg_path,
                             None,
                         )
                         successful += 1
