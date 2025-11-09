@@ -842,44 +842,6 @@ class VideoProcessor:
         movie_data = [{"Key": obj["Key"], "Size": obj["Size"]} for obj in objects]
         return pd.DataFrame(movie_data)
 
-    def _cleanup_local_files(
-        self,
-        downloaded_files: List[Path],
-        output_path: Optional[Path],
-        drop_specific_download_dir: Optional[Path] = None,
-        drop_id: str = ""
-    ) -> None:
-        """Clean up local files after processing."""
-        if not self.test_mode:
-            logger.info(f"🗑️  Cleaning up local files for {drop_id}...")
-            deleted_count = 0
-            for file_path in downloaded_files:
-                if file_path.exists():
-                    try:
-                        file_path.unlink()
-                        deleted_count += 1
-                    except Exception as e:
-                        logger.warning(f"   ✗ Could not delete {file_path.name}: {e}")
-            
-            logger.info(f"   Deleted {deleted_count}/{len(downloaded_files)} local video file(s)")
-            
-            if drop_specific_download_dir and drop_specific_download_dir.exists():
-                try:
-                    drop_specific_download_dir.rmdir()
-                    logger.info(f"   ✓ Removed drop directory: {drop_specific_download_dir.name}")
-                except OSError:
-                    logger.debug(f"   Could not remove {drop_specific_download_dir.name} (not empty)")
-        else:
-            logger.info(f"🧪 Test mode: Keeping {len(downloaded_files)} downloaded file(s) for {drop_id}")
-            
-        # Clean up output file after upload (in non-test mode)
-        if output_path and output_path.exists() and not self.test_mode:
-            try:
-                output_path.unlink()
-                logger.info(f"   ✓ Deleted local output file: {output_path.name}")
-            except Exception as e:
-                logger.warning(f"   ✗ Could not delete output file {output_path.name}: {e}")
-
     def find_already_concatenated_movies_df(
         self, size_tolerance: float = 0.01
     ) -> pd.DataFrame:
