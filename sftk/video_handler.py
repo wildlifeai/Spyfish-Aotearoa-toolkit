@@ -18,9 +18,23 @@ import pandas as pd
 from sftk.s3_handler import ProgressTracker, S3Handler
 from sftk.common import S3_BUCKET
 
+import shutil
+
+
+
 logger = logging.getLogger(__name__)
 
 
+def _check_disk_space(path: Path, required_gb: float = 10) -> bool:
+    """Check if sufficient disk space is available."""
+    stat = shutil.disk_usage(path)
+    free_gb = stat.free / (1024**3)
+    if free_gb < required_gb:
+        logger.error(f"❌ Insufficient disk space: {free_gb:.1f} GB free, {required_gb:.1f} GB required")
+        return False
+    logger.info(f"✓ Disk space check passed: {free_gb:.1f} GB free")
+    return True
+    
 def _find_ffmpeg() -> Optional[str]:
     """Find ffmpeg executable."""
     if shutil.which("ffmpeg"):
@@ -116,6 +130,12 @@ def _should_download_file(local_path: Path, s3_size: int, tolerance: float = 0.0
 
 def _verify_video_file_deep(file_path: Path) -> bool:
     """Deep verification using ffprobe."""
+    # Check if ffprobe exists
+    if not shutil.which("ffprobe"):
+        logger.warning(f"ffprobe not found, skipping deep verification for {file_path.name}")
+        # Fall back to basic file size check
+        return file_path.exists() and file_path.stat().st_size > 0
+    
     try:
         cmd = [
             "ffprobe",
@@ -136,12 +156,15 @@ def _verify_video_file_deep(file_path: Path) -> bool:
             return True
         logger.error(f"✗ Invalid video format for {file_path.name}")
         return False
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-        json.JSONDecodeError,
-        Exception,
-    ) as e:
+    except subprocess.CalledProcessError as e:
+        # Exit code 127 specifically means command not found
+        if e.returncode == 127:
+            logger.error(f"ffprobe command not found - cannot verify {file_path.name}")
+            # Optionally: return True here if you trust your downloads
+            return file_path.exists() and file_path.stat().st_size > 0
+        logger.error(f"✗ Error verifying video file {file_path.name}: {e}")
+        return False
+    except Exception as e:
         logger.error(f"✗ Error verifying video file {file_path.name}: {e}")
         return False
 
@@ -431,6 +454,11 @@ def _process_single_drop(
     downloaded_files = []
     output_path = None
     drop_download_dir: Optional[Path] = None
+
+    # Check disk space before downloading
+    total_size_gb = sum(sizes) / (1024**3)
+    if not _check_disk_space(Path(download_dir), required_gb=total_size_gb * 1.5):
+        raise RuntimeError(f"Insufficient disk space for {drop_id}")
 
     def _download_videos_parallel(keys_with_sizes: list) -> List[Path]:
         """Download all videos for a drop in parallel."""
