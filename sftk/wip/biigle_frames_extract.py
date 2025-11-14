@@ -1,3 +1,4 @@
+import logging
 import re
 import subprocess
 from pathlib import Path
@@ -64,8 +65,8 @@ def save_grabs_from_df(df, video_root, out_dir, *, fast=True, limit=None):
     video_root = Path(video_root).resolve()
     out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    print("Video root:", video_root)
-    print("Output dir:", out_dir)
+    logging.info("Video root: %s", video_root)
+    logging.info("Output dir: %s", out_dir)
 
     ok = fail = 0
     for i, (_, r) in enumerate(df.iterrows(), start=1):
@@ -79,13 +80,13 @@ def save_grabs_from_df(df, video_root, out_dir, *, fast=True, limit=None):
 
             in_path = (video_root / fname).resolve()
             if not in_path.exists():
-                print(f"[{i}] MISSING: {in_path}")
+                logging.info(f"[{i}] MISSING: {in_path}")
                 fail += 1
                 continue
 
             t_in, clip_dur = _time_in_file(in_path, start_s, frame_s)
             if clip_dur is not None and not (0.0 <= t_in <= clip_dur):
-                print(
+                logging.info(
                     f"[{i}] WARN: t={t_in:.3f}s outside clip duration {clip_dur:.3f}s; clamping"
                 )
                 t_in = max(0.0, min(clip_dur - 1e-3, t_in))
@@ -126,22 +127,22 @@ def save_grabs_from_df(df, video_root, out_dir, *, fast=True, limit=None):
             )
             cmd += ["-frames:v", "1", "-q:v", "2", str(out_img)]
 
-            print(f"[{i}] RUN:", " ".join(cmd))
+            logging.info(f"[{i}] RUN:", " ".join(cmd))
             subprocess.run(cmd, check=True)
 
             if not out_img.exists() or out_img.stat().st_size == 0:
                 raise RuntimeError(f"Encoded file missing/empty: {out_img}")
 
-            print(f"[{i}] OK  -> {out_img}")
+            logging.info(f"[{i}] OK  -> {out_img}")
             ok += 1
         except subprocess.CalledProcessError as e:
-            print(f"[{i}] FFMPEG ERROR ({e.returncode})")
+            logging.info(f"[{i}] FFMPEG ERROR ({e.returncode})")
             fail += 1
         except Exception as e:
-            print(f"[{i}] ERROR: {e}")
+            logging.info(f"[{i}] ERROR: {e}")
             fail += 1
 
-    print(f"Done. ok={ok}, fail={fail}")
+    logging.info(f"Done. ok={ok}, fail={fail}")
     return ok, fail
 
 

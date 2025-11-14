@@ -328,8 +328,8 @@ def test_validation_config_methods_consistency():
 
 def test_relationship_validator_dropid_replicate_mismatch():
     """RelationshipValidator should provide specific error message for DropID replicate mismatch."""
-    from sftk.validation_strategies import RelationshipValidator
     from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+    from sftk.validation_strategies import RelationshipValidator
 
     validator = RelationshipValidator({})
 
@@ -346,12 +346,16 @@ def test_relationship_validator_dropid_replicate_mismatch():
     }
 
     # Create test data where DropID ends with '01' but ReplicateWithinSite is 2 (should be '02')
-    df = pd.DataFrame({
-        "DropID": ["HOR_20211122_BUV_HOR_003_01"],
-        "SurveyID": ["HOR_20211122_BUV"],
-        "SiteID": ["HOR_003"],
-        "ReplicateWithinSite": [2]  # This should make expected DropID end with '02'
-    })
+    df = pd.DataFrame(
+        {
+            "DropID": ["HOR_20211122_BUV_HOR_003_01"],
+            "SurveyID": ["HOR_20211122_BUV"],
+            "SiteID": ["HOR_003"],
+            "ReplicateWithinSite": [
+                2
+            ],  # This should make expected DropID end with '02'
+        }
+    )
 
     errors = validator.validate(rules, df)
 
@@ -365,8 +369,8 @@ def test_relationship_validator_dropid_replicate_mismatch():
 
 def test_relationship_validator_dropid_full_mismatch():
     """RelationshipValidator should provide generic error message for full DropID mismatch."""
-    from sftk.validation_strategies import RelationshipValidator
     from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+    from sftk.validation_strategies import RelationshipValidator
 
     validator = RelationshipValidator({})
 
@@ -382,12 +386,14 @@ def test_relationship_validator_dropid_full_mismatch():
     }
 
     # Create test data where DropID has different SiteID (not just replicate mismatch)
-    df = pd.DataFrame({
-        "DropID": ["HOR_20211122_BUV_HOR_004_01"],  # Different SiteID (004 vs 003)
-        "SurveyID": ["HOR_20211122_BUV"],
-        "SiteID": ["HOR_003"],
-        "ReplicateWithinSite": [2]
-    })
+    df = pd.DataFrame(
+        {
+            "DropID": ["HOR_20211122_BUV_HOR_004_01"],  # Different SiteID (004 vs 003)
+            "SurveyID": ["HOR_20211122_BUV"],
+            "SiteID": ["HOR_003"],
+            "ReplicateWithinSite": [2],
+        }
+    )
 
     errors = validator.validate(rules, df)
 
