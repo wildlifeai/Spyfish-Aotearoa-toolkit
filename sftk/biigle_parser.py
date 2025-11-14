@@ -9,6 +9,7 @@ from sftk.biigle_handler import BiigleHandler
 from sftk.common import BIIGLE_API_EMAIL, BIIGLE_API_TOKEN
 
 SCALE_BAR_LENGTH_CM = 10
+SCALE_BAR_LABEL_NAME = "Scale bar"
 
 
 class BiigleParser:
@@ -125,19 +126,19 @@ class BiigleParser:
 
         sizes_df = annotations_df[annotations_df["shape_name"] == "LineString"].copy()
 
-        if not (sizes_df["label_name"] == "Scale bar").any():
+        if not (sizes_df["label_name"] == SCALE_BAR_LABEL_NAME).any():
             return pd.DataFrame()
 
         sizes_df["size_px"] = sizes_df["points"].apply(self.get_size)
 
         # In case people drew more scale bars.
-        scale_size = sizes_df[sizes_df["label_name"] == "Scale bar"][
+        scale_size = sizes_df[sizes_df["label_name"] == SCALE_BAR_LABEL_NAME][
             "size_px"
         ].mean()
         sizes_df["size_cm"] = sizes_df["size_px"] * SCALE_BAR_LENGTH_CM / scale_size
 
         # Drop scale bar:
-        sizes_df = sizes_df[sizes_df["label_name"] != "Scale bar"]
+        sizes_df = sizes_df[sizes_df["label_name"] != SCALE_BAR_LABEL_NAME]
 
         sizes_df = sizes_df.sort_values(
             ["start_seconds", "frame_seconds"], ascending=[True, True]
@@ -230,4 +231,6 @@ class BiigleParser:
 
 if __name__ == "__main__":
     biigle_parser = BiigleParser()
-    processed_annotations_df = biigle_parser.process_video_annotations(25516)
+    # processed_annotations_df = biigle_parser.process_video_annotations(25516)
+    processed_annotations_df = biigle_parser.process_video_annotations(26577)
+    print(processed_annotations_df)
