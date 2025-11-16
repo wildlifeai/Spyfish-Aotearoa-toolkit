@@ -11,7 +11,8 @@ import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
+import re
 
 import pandas as pd
 
@@ -23,6 +24,59 @@ import shutil
 
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_gopro_sequence_id(filename: str) -> Optional[str]:
+    """
+    Extract the sequence ID from a GoPro filename.
+    
+    Supports multiple GoPro naming patterns:
+        - GOPR0298.MP4 -> "0298"
+        - GP010298.MP4 -> "0298"
+        - GP020392.MP4 -> "0392"
+        - GX010425.MP4 -> "0425"
+        - GH010298.MP4 -> "0298"
+        - GL010298.MP4 -> "0298"
+    
+    Returns:
+        The last 4 digits before the extension, or None if not a valid GoPro file
+    """
+    # Match GoPro pattern: GOPR or G[A-Z][0-9][0-9] followed by 4 digits
+    # This covers GOPR, GP##, GX##, GH##, GL##, etc.
+    pattern = rf"^(GOPR|G[A-Z]\d{{2}})(\d{{4}})\.MP4$"
+    match = re.match(pattern, filename, re.IGNORECASE)
+    
+    if match:
+        return match.group(2)  # Return the 4-digit sequence ID
+    return None
+
+
+def _group_videos_by_sequence(keys_with_sizes: List[tuple]) -> Dict[str, List[tuple]]:
+    """
+    Group video files by their GoPro sequence ID.
+    
+    Args:
+        keys_with_sizes: List of (key, size) tuples
+    
+    Returns:
+        Dictionary mapping sequence_id -> list of (key, size) tuples
+    """
+    sequences = {}
+    
+    for key, size in keys_with_sizes:
+        filename = Path(key).name
+        seq_id = _extract_gopro_sequence_id(filename)
+        
+        if seq_id:
+            if seq_id not in sequences:
+                sequences[seq_id] = []
+            sequences[seq_id].append((key, size))
+        else:
+            # If we can't extract sequence ID, treat as its own sequence
+            logger.warning(f"Could not extract sequence ID from {filename}, treating as separate sequence")
+            sequences[filename] = [(key, size)]
+    
+    return sequences
 
 
 def _check_disk_space(path: Path, required_gb: float = 10) -> bool:
@@ -335,9 +389,10 @@ def _upload_and_cleanup_s3(
     """Upload concatenated video and delete original parts from S3 if configured."""
     drop_id = upload_data['DropID']
     survey_id = upload_data['SurveyID']
-    new_key = f"media/{survey_id}/{drop_id}/{drop_id}.mp4"
+    sequence_suffix = upload_data.get('sequence_suffix', '')
+    new_key = f"media/{survey_id}/{drop_id}/{drop_id}{sequence_suffix}.mp4"
 
-    logger.info(f"⬆️  Uploading to S3: {new_key}")
+    logger.info(f"⬆️ Uploading to S3: {new_key}")
     file_size = output_path.stat().st_size
     
     upload_progress = ProgressTracker(
@@ -355,7 +410,7 @@ def _upload_and_cleanup_s3(
     upload_progress.complete()
     
     if delete_originals:
-        logger.info(f"🗑️  Deleting {len(upload_data['Key'])} original file(s) from S3...")
+        logger.info(f"🗑️ Deleting {len(upload_data['Key'])} original file(s) from S3...")
         deleted_count = 0
         failed_count = 0
         for key in upload_data['Key']:
@@ -372,18 +427,18 @@ def _upload_and_cleanup_s3(
         else:
             logger.info(f"✅ Successfully deleted all {deleted_count} original files from S3")
     else:
-        logger.info(f"ℹ️  Keeping original files in S3 (delete_originals=False)")
+        logger.info(f"ℹ️ Keeping original files in S3 (delete_originals=False)")
 
 def _cleanup_local_files(
     downloaded_files: List[Path],
-    output_path: Optional[Path],
+    output_paths: List[Path],
     drop_specific_download_dir: Optional[Path],
     drop_id: str,
     test_mode: bool
 ) -> None:
     """Clean up local files after processing."""
     if not test_mode:
-        logger.info(f"🗑️  Cleaning up local files for {drop_id}...")
+        logger.info(f"🗑️ Cleaning up local files for {drop_id}...")
         deleted_count = 0
         for file_path in downloaded_files:
             if file_path.exists():
@@ -404,12 +459,14 @@ def _cleanup_local_files(
     else:
         logger.info(f"🧪 Test mode: Keeping {len(downloaded_files)} downloaded file(s) for {drop_id}")
         
-    if output_path and output_path.exists() and not test_mode:
-        try:
-            output_path.unlink()
-            logger.info(f"   ✓ Deleted local output file: {output_path.name}")
-        except Exception as e:
-            logger.warning(f"   ✗ Could not delete output file {output_path.name}: {e}")
+    if not test_mode:
+        for output_path in output_paths:
+            if output_path and output_path.exists():
+                try:
+                    output_path.unlink()
+                    logger.info(f"   ✓ Deleted local output file: {output_path.name}")
+                except Exception as e:
+                    logger.warning(f"   ✗ Could not delete output file {output_path.name}: {e}")
 
 def _process_single_drop(
     drop_data_dict: dict,
@@ -419,12 +476,13 @@ def _process_single_drop(
     test_mode: bool,
     max_workers: int,
     sequential_download: bool,
-    s3_bucket: str,  # Pass bucket name instead of handler
+    s3_bucket: str,
     ffmpeg_path: str,
+    gopro_prefix: str,
     log_queue: Optional[Queue] = None,
 ) -> None:
     """
-    Process a single drop's worth of videos.
+    Process a single drop's worth of videos, handling multiple sequences within the drop.
     """
     if log_queue:
         _worker_log_config(log_queue)
@@ -452,7 +510,7 @@ def _process_single_drop(
     process_logger.debug(f"Initialized S3Handler for {drop_id}")
     
     downloaded_files = []
-    output_path = None
+    output_paths = []
     drop_download_dir: Optional[Path] = None
 
     # Check disk space before downloading
@@ -485,27 +543,21 @@ def _process_single_drop(
                     s3_handler, 
                     key, 
                     str(local_path),
-                    s3_size,  # Pass size for progress tracking
-                    3600      # timeout
+                    s3_size,
+                    3600
                 )
 
-                futures[future] = (key, local_path, time.time())  # Add start time
+                futures[future] = (key, local_path, time.time())
 
             if files_to_download > 0:
                 process_logger.info(f"⬇ Downloading {files_to_download} file(s) in parallel...")
-                print(f"DEBUG: About to wait for {len(futures)} futures", flush=True)
-                import sys
-                sys.stdout.flush()
             
             completed = 0
-            for future in as_completed(futures, timeout=3600):  # 1 hour timeout for all downloads
-                print(f"DEBUG: Got completed future!", flush=True)
+            for future in as_completed(futures, timeout=3600):
                 key, local_path, start_time = futures[future]
                 completed += 1
-                print(f"[DOWNLOAD] Completed {completed}/{files_to_download}: {local_path.name}", flush=True)
                 try:
                     result = future.result()
-                    print(f"[DOWNLOAD] Result for {local_path.name}: {result}", flush=True)
                     if result:
                         downloaded_files_local.append(local_path)
                         elapsed = time.time() - start_time
@@ -516,13 +568,10 @@ def _process_single_drop(
                         )
                     else:
                         process_logger.error(f"✗ Download failed for {Path(key).name} (returned False)")
-                        print(f"[DOWNLOAD] FAILED: {Path(key).name}", flush=True)
                 except TimeoutError as e:
                     process_logger.error(f"✗ Download timeout for {Path(key).name}")
-                    print(f"[DOWNLOAD] TIMEOUT: {Path(key).name}", flush=True)
                 except Exception as e:
                     process_logger.error(f"✗ Download exception for {Path(key).name}: {e}")
-                    print(f"[DOWNLOAD] EXCEPTION for {Path(key).name}: {e}", flush=True)
         
         return sorted(downloaded_files_local)
 
@@ -532,16 +581,18 @@ def _process_single_drop(
         drop_download_dir = base_download_dir / drop_id
         drop_download_dir.mkdir(parents=True, exist_ok=True)
         
-        output_path = Path(output_dir) / f"{drop_id}.mp4"
-        
-        # Check if output already exists (race condition protection)
-        if output_path.exists():
-            process_logger.warning(f"⚠ Output file {output_path.name} already exists, skipping processing")
-            return
-
         # Create list of (key, size) tuples
         keys_with_sizes = list(zip(keys, sizes))
-
+        
+        # Group videos by sequence
+        sequences = _group_videos_by_sequence(keys_with_sizes)
+        
+        process_logger.info(f"📊 Found {len(sequences)} video sequence(s) in drop {drop_id}")
+        
+        # Sort sequences by their ID to ensure consistent ordering
+        sorted_sequences = sorted(sequences.items())
+        
+        # Download all files (once for all sequences)
         if not sequential_download:
             downloaded_files = _download_videos_parallel(keys_with_sizes)
         else:
@@ -589,25 +640,52 @@ def _process_single_drop(
             if f.stat().st_size == 0:
                 raise RuntimeError(f"File {f.name} is empty (0 bytes)")
 
-        survey_id = drop_data_dict['survey_id']
-        
-        process_logger.info(f"🎞️  Concatenating videos into: {output_path.name}")
-        concatenation_success, concatenation_message = _concatenate_videos(
-            downloaded_files, output_path, ffmpeg_path
-        )
-        
-        if not concatenation_success:
-            raise RuntimeError(f"Video concatenation failed: {concatenation_message}")
+        # Process each sequence separately
+        for seq_index, (seq_id, seq_files) in enumerate(sorted_sequences):
+            # Determine suffix (_A, _B, _C, etc.)
+            if len(sorted_sequences) > 1:
+                suffix = f"_{chr(65 + seq_index)}"  # 65 is ASCII for 'A'
+            else:
+                suffix = ""
+            
+            output_path = Path(output_dir) / f"{drop_id}{suffix}.mp4"
+            output_paths.append(output_path)
+            
+            # Check if output already exists
+            if output_path.exists():
+                process_logger.warning(f"⚠ Output file {output_path.name} already exists, skipping")
+                continue
+            
+            # Get local paths for this sequence
+            seq_local_paths = []
+            for key, size in seq_files:
+                local_path = drop_download_dir / Path(key).name
+                if local_path in downloaded_files:
+                    seq_local_paths.append(local_path)
+            
+            seq_local_paths = sorted(seq_local_paths)
+            
+            process_logger.info(f"🎞️ Concatenating sequence {seq_id} ({len(seq_local_paths)} files) -> {output_path.name}")
+            concatenation_success, concatenation_message = _concatenate_videos(
+                seq_local_paths, output_path, ffmpeg_path
+            )
+            
+            if not concatenation_success:
+                raise RuntimeError(f"Video concatenation failed for sequence {seq_id}: {concatenation_message}")
 
-        if not test_mode:
-            upload_data = {
-                'DropID': drop_id,
-                'SurveyID': survey_id,
-                'Key': keys
-            }
-            _upload_and_cleanup_s3(s3_handler, output_path, upload_data, delete_originals)
-        else:
-            process_logger.info(f"🧪 Test mode: Skipping S3 upload for {drop_id}")
+            if not test_mode:
+                # Get keys for this sequence
+                seq_keys = [key for key, size in seq_files]
+                
+                upload_data = {
+                    'DropID': drop_id,
+                    'SurveyID': survey_id,
+                    'Key': seq_keys,
+                    'sequence_suffix': suffix
+                }
+                _upload_and_cleanup_s3(s3_handler, output_path, upload_data, delete_originals)
+            else:
+                process_logger.info(f"🧪 Test mode: Skipping S3 upload for {output_path.name}")
             
     except Exception as e:
         process_logger.error(f"❌ Failed to process drop {drop_id}: {e}")
@@ -616,7 +694,7 @@ def _process_single_drop(
         if drop_download_dir:
             _cleanup_local_files(
                 downloaded_files,
-                output_path,
+                output_paths,
                 drop_download_dir,
                 drop_id,
                 test_mode
@@ -802,6 +880,7 @@ class VideoProcessor:
                             self.sequential_download,
                             self.s3_handler.bucket,
                             self.ffmpeg_path,
+                            self.gopro_prefix,
                             log_queue,
                         )
                         futures_to_drop_id[future] = drop_id
@@ -836,6 +915,7 @@ class VideoProcessor:
                             self.sequential_download,
                             self.s3_handler.bucket,  # Pass bucket name
                             self.ffmpeg_path,
+                            self.gopro_prefix,
                             None,
                         )
                         successful += 1
