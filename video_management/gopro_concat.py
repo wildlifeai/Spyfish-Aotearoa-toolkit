@@ -18,12 +18,7 @@ import os
 import subprocess
 import argparse
 import logging
-
-# Add the toolkit to the path if needed
-# sys.path.append('/path/to/Spyfish-Aotearoa-toolkit/')
-
-from sftk.s3_handler import S3Handler
-from sftk.video_handler import VideoProcessor
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -167,10 +162,39 @@ def main():
     
     args = parser.parse_args()
     
-    # Add toolkit to path if specified
+    # Add toolkit to path if specified, otherwise try to find it
     if args.toolkit_path:
         sys.path.insert(0, args.toolkit_path)
         logger.info(f"Added toolkit path: {args.toolkit_path}")
+    else:
+        # Try to automatically find the toolkit directory
+        # Look in parent directory or common locations
+        script_dir = Path(__file__).resolve().parent
+        possible_paths = [
+            script_dir.parent,  # One level up from script
+            script_dir.parent.parent,  # Two levels up
+            Path('/nesi/project/wildlife03546/Spyfish-Aotearoa-toolkit'),  # NeSI default
+            Path.home() / 'Spyfish-Aotearoa-toolkit',  # Home directory
+        ]
+        
+        for path in possible_paths:
+            sftk_path = path / 'sftk'
+            if sftk_path.exists() and sftk_path.is_dir():
+                sys.path.insert(0, str(path))
+                logger.info(f"Auto-detected toolkit path: {path}")
+                break
+        else:
+            logger.warning("Could not auto-detect toolkit path. You may need to specify --toolkit-path")
+    
+    # Import after adding to path
+    try:
+        from sftk.s3_handler import S3Handler
+        from sftk.video_handler import VideoProcessor
+    except ImportError as e:
+        logger.error(f"Failed to import sftk modules: {e}")
+        logger.error("Please specify the toolkit path using --toolkit-path")
+        logger.error("Example: --toolkit-path /path/to/Spyfish-Aotearoa-toolkit")
+        return 1
     
     # Setup FFmpeg on NeSI if requested
     if args.use_nesi_ffmpeg:
