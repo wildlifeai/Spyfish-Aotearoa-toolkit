@@ -104,10 +104,15 @@ def _find_ffmpeg() -> Optional[str]:
 
 def _worker_log_config(log_queue: Queue) -> None:
     """Configure logging for a worker process to send logs to a queue."""
-    queue_handler = QueueHandler(log_queue)
+    # Clear existing handlers first
     root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    
+    # Now add the queue handler
+    queue_handler = QueueHandler(log_queue)
     root_logger.addHandler(queue_handler)
     root_logger.setLevel(logging.INFO)
+    
     
     # Suppress noisy S3Handler initialization logs in workers
     # This must be done AFTER creating the handler
