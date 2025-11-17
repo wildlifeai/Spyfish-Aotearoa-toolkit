@@ -33,6 +33,8 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Union
 import boto3
 import pandas as pd
 from botocore.exceptions import BotoCoreError, ClientError
+from botocore.config import Config
+
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
 from sftk.utils import (
@@ -180,11 +182,18 @@ class S3Handler:
         if not self.bucket:
             raise ValueError("S3_BUCKET environment variable not set or bucket not provided.")
 
+        # Configure boto3 with larger connection pool
+        boto_config = Config(
+            max_pool_connections=50,  # Increase from default 10
+            retries={'max_attempts': 3, 'mode': 'adaptive'}
+        )
+
         self.s3 = s3_client or boto3.client(
-                    "s3",
-                    aws_access_key_id=AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                )
+            "s3",
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            config=boto_config  # Add config here
+        )
         self._initialized = True
         logging.info("S3Handler initialized for bucket: %s", self.bucket)
 
@@ -254,11 +263,11 @@ class S3Handler:
 
             # Configure transfer for better performance with large files
             config = TransferConfig(
-                max_concurrency=10,
-                multipart_threshold=8 * 1024 * 1024,  # 8MB
-                multipart_chunksize=8 * 1024 * 1024,  # 8MB
+                max_concurrency=5, 
+                multipart_threshold=8 * 1024 * 1024,
+                multipart_chunksize=8 * 1024 * 1024,
                 num_download_attempts=3,
-                use_threads=True  # Enable multi-threading for better performance
+                use_threads=True
             )
 
             if callback:
