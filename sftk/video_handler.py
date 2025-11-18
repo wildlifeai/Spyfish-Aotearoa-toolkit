@@ -26,23 +26,44 @@ import shutil
 logger = logging.getLogger(__name__)
 
 
-def _extract_gopro_sequence_id(filename: str) -> Optional[str]:
+def _extract_gopro_sequence_id(filename: str, gopro_prefix: str = "GX") -> Optional[str]:
     """
-    Extract the sequence ID from a GoPro filename.
+    Extract the sequence ID from a GoPro or Orau filename.
     
-    Supports multiple GoPro naming patterns:
+    Supports multiple naming patterns:
+        Standard GoPro:
         - GOPR0298.MP4 -> "0298"
         - GP010298.MP4 -> "0298"
         - GP020392.MP4 -> "0392"
         - GX010425.MP4 -> "0425"
         - GH010298.MP4 -> "0298"
         - GL010298.MP4 -> "0298"
+        
+        Other format:
+        - Orau_NR_E1_1A.MP4 -> "1"
+        - Orau_NR_E1_1B.MP4 -> "1"
+        - Orau_NR_E1_1C.MP4 -> "1"
+        - Orau_NR_E1_2A.MP4 -> "2"
+    
+    Args:
+        filename: The filename to parse
+        gopro_prefix: The prefix to look for (e.g., "GX", "Orau_")
     
     Returns:
-        The last 4 digits before the extension, or None if not a valid GoPro file
+        The sequence ID, or None if not a valid format
     """
+    # Handle Orau_ format
+    if gopro_prefix == "Orau_":
+        # Pattern: Orau_*_*_<number><letter>.MP4
+        # Extract just the numeric part before the letter suffix
+        pattern = r"^Orau_.*_(\d+)[A-Z]\.MP4$"
+        match = re.match(pattern, filename, re.IGNORECASE)
+        if match:
+            return match.group(1)  # Return just the number (e.g., "1" from "1A")
+        return None
+    
+    # Handle standard GoPro format
     # Match GoPro pattern: GOPR or G[A-Z][0-9][0-9] followed by 4 digits
-    # This covers GOPR, GP##, GX##, GH##, GL##, etc.
     pattern = rf"^(GOPR|G[A-Z]\d{{2}})(\d{{4}})\.MP4$"
     match = re.match(pattern, filename, re.IGNORECASE)
     
@@ -51,12 +72,13 @@ def _extract_gopro_sequence_id(filename: str) -> Optional[str]:
     return None
 
 
-def _group_videos_by_sequence(keys_with_sizes: List[tuple]) -> Dict[str, List[tuple]]:
+def _group_videos_by_sequence(keys_with_sizes: List[tuple], gopro_prefix: str = "GX") -> Dict[str, List[tuple]]:
     """
-    Group video files by their GoPro sequence ID.
+    Group video files by their sequence ID.
     
     Args:
         keys_with_sizes: List of (key, size) tuples
+        gopro_prefix: The prefix to use for grouping (e.g., "GX", "Orau_")
     
     Returns:
         Dictionary mapping sequence_id -> list of (key, size) tuples
@@ -65,7 +87,7 @@ def _group_videos_by_sequence(keys_with_sizes: List[tuple]) -> Dict[str, List[tu
     
     for key, size in keys_with_sizes:
         filename = Path(key).name
-        seq_id = _extract_gopro_sequence_id(filename)
+        seq_id = _extract_gopro_sequence_id(filename, gopro_prefix)
         
         if seq_id:
             if seq_id not in sequences:
@@ -590,7 +612,7 @@ def _process_single_drop(
         keys_with_sizes = list(zip(keys, sizes))
         
         # Group videos by sequence
-        sequences = _group_videos_by_sequence(keys_with_sizes)
+        sequences = _group_videos_by_sequence(keys_with_sizes, gopro_prefix)
         
         process_logger.info(f"📊 Found {len(sequences)} video sequence(s) in drop {drop_id}")
         
