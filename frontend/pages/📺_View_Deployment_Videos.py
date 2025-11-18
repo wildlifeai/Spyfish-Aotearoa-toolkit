@@ -1,4 +1,7 @@
+import hmac
+
 import streamlit as st
+from botocore.exceptions import ClientError
 
 from sftk.common import S3_BUCKET
 from sftk.s3_handler import S3Handler
@@ -12,10 +15,19 @@ def _get_s3_client():
     return s3_handler.s3
 
 
+st.write("This is Work in Progress, please share any issues.")
+
+
 # TODO check if the file exists, add DropID validation etcetc
 # --- Helper to generate a presigned URL ---
 def get_presigned_url(key: str, expires_in: int = 3600) -> str:
     s3 = _get_s3_client()
+    try:
+        s3.head_object(Bucket=S3_BUCKET, Key=key)
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            return None  # Object not found
+        raise  # Re-raise other S3 client errors
     return s3.generate_presigned_url(
         ClientMethod="get_object",
         Params={"Bucket": S3_BUCKET, "Key": key},
@@ -34,7 +46,7 @@ def check_password():
     if not st.session_state.password_correct:
         password = st.text_input("Password", type="password")
         if st.button("Login"):
-            if password == st.secrets.get("APP_PASSWORD"):
+            if hmac.compare_digest(password, st.secrets.get("APP_PASSWORD", "")):
                 st.session_state.password_correct = True
                 st.rerun()
             else:
@@ -66,15 +78,20 @@ else:
 
     if st.button("Generate URL and play video"):
         if not s3_key:
-            st.error("Please provide the DropID.")
+            st.error("Please provide an S3 path or a DropID.")
         else:
-            st.subheader("Video preview.")
+
             ps_url = get_presigned_url(s3_key)
-            st.write(
-                "Does the path look ok? (In the future this will check automatically.)"
-            )
-            st.code(s3_key, language="text")
-            st.write(
-                "The video box will show even if there is no video, so if it doesn't load, check the path above."
-            )
-            st.video(ps_url)
+
+            if ps_url:
+                st.subheader("Video preview.")
+                st.write(
+                    "Does the path look ok? (In the future this will check automatically.)"
+                )
+                st.code(s3_key, language="text")
+                st.write(
+                    "The video box will show even when there are issues, so check above/try again later, or raise an issue."
+                )
+                st.video(ps_url)
+            else:
+                st.error(f"Video not found at path: {s3_key}")
