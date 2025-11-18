@@ -20,7 +20,7 @@ st.write("This is Work in Progress, please share any issues.")
 
 # TODO check if the file exists, add DropID validation etcetc
 # --- Helper to generate a presigned URL ---
-def get_presigned_url(key: str, expires_in: int = 3600) -> str:
+def get_presigned_url(key: str, expires_in: int = 3600) -> str | None:
     s3 = _get_s3_client()
     try:
         s3.head_object(Bucket=S3_BUCKET, Key=key)
@@ -46,7 +46,9 @@ def check_password():
     if not st.session_state.password_correct:
         password = st.text_input("Password", type="password")
         if st.button("Login"):
-            if hmac.compare_digest(password, st.secrets.get("APP_PASSWORD", "")):
+            app_password = st.secrets.get("APP_PASSWORD")
+
+            if app_password is not None and hmac.compare_digest(password, app_password):
                 st.session_state.password_correct = True
                 st.rerun()
             else:
@@ -71,10 +73,11 @@ else:
     else:
         drop_id = st.text_input("Provide DropID")
         s3_key = f"media/{drop_id[:16]}/{drop_id[:27]}/{drop_id}"
-        if not s3_key.endswith(".mp4"):
-            s3_key += ".mp4"
-        else:
-            s3_key = ""
+        if drop_id:
+            if not s3_key.endswith(".mp4"):
+                s3_key += ".mp4"
+            else:
+                s3_key = ""
 
     if st.button("Generate URL and play video"):
         if not s3_key:
