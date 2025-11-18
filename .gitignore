@@ -13,6 +13,7 @@ spyfish_analysis/
 .python-version
 .DS_Store
 .vscode/
+*/.streamlit/*
 .venv
 .idea
 

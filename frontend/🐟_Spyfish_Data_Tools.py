@@ -26,7 +26,12 @@ with cols[0]:
         "Export Biigle annotations, review max count, and investigate size results."
     )
 with cols[1]:
-    st.markdown("TBD")
+    st.page_link(
+        "pages/📺_View_Deployment_Videos.py",
+        label="View Deployment Videos",
+        icon="📺",
+    )
+    st.caption("View videos from the deployments.")
 with cols[2]:
     st.markdown("TBD")
 
