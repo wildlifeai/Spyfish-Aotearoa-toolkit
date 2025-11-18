@@ -1,12 +1,21 @@
-import boto3
 import streamlit as st
 
 from sftk.common import S3_BUCKET
+from sftk.s3_handler import S3Handler
 
 
 # --- Helper to generate a presigned URL ---
+@st.cache_resource
+def _get_s3_client():
+    """Get a cached S3 client."""
+    s3_handler = S3Handler()
+    return s3_handler.s3
+
+
+# TODO check if the file exists, add DropID validation etcetc
+# --- Helper to generate a presigned URL ---
 def get_presigned_url(key: str, expires_in: int = 3600) -> str:
-    s3 = boto3.client("s3")
+    s3 = _get_s3_client()
     return s3.generate_presigned_url(
         ClientMethod="get_object",
         Params={"Bucket": S3_BUCKET, "Key": key},
@@ -25,8 +34,9 @@ def check_password():
     if not st.session_state.password_correct:
         password = st.text_input("Password", type="password")
         if st.button("Login"):
-            if password == st.secrets["APP_PASSWORD"]:
+            if password == st.secrets.get("APP_PASSWORD"):
                 st.session_state.password_correct = True
+                st.rerun()
             else:
                 st.error("❌ Incorrect password")
         return False
@@ -42,19 +52,29 @@ else:
 
     # --- Streamlit UI ---
     st.title("Deployment Video player")
-
-    key = st.text_input("Provide DropID")
-    url = f"media/{key[:16]}/{key[:27]}/{key}"
-    if not url.endswith(".mp4"):
-        url += ".mp4"
+    # --- Checkbox: Use direct S3 path OR DropID ---
+    use_direct_path = st.checkbox("Provide full S3 path instead of DropID")
+    if use_direct_path:
+        s3_key = st.text_input("Enter full S3 object path (key)")
+    else:
+        drop_id = st.text_input("Provide DropID")
+        s3_key = f"media/{drop_id[:16]}/{drop_id[:27]}/{drop_id}"
+        if not s3_key.endswith(".mp4"):
+            s3_key += ".mp4"
+        else:
+            s3_key = ""
 
     if st.button("Generate URL and play video"):
-        if not url:
+        if not s3_key:
             st.error("Please provide the DropID.")
         else:
-            ps_url = get_presigned_url(url)
-            st.write("Presigned URL (temporary):")
-            st.code(ps_url, language="text")
-
-            st.subheader("Video preview")
+            st.subheader("Video preview.")
+            ps_url = get_presigned_url(s3_key)
+            st.write(
+                "Does the path look ok? (In the future this will check automatically.)"
+            )
+            st.code(s3_key, language="text")
+            st.write(
+                "The video box will show even if there is no video, so if it doesn't load, check the path above."
+            )
             st.video(ps_url)
