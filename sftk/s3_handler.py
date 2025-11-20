@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 import boto3
+from boto3.s3.transfer import TransferConfig
 import pandas as pd
 from botocore.exceptions import BotoCoreError, ClientError
 from botocore.config import Config
@@ -248,8 +249,7 @@ class S3Handler:
         if not key or not filename:
             raise ValueError("S3 key and local filename must be provided.")
         
-        try:
-            from boto3.s3.transfer import TransferConfig
+        try:            
             
             kwargs: Dict[str, Any] = {"Bucket": self.bucket, "Key": key}
             if version_id:
