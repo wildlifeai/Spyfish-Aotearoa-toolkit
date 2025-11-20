@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -23,10 +24,10 @@ def load_env_wrapper() -> None:
     
     # Check if the file exists before trying to load it
     if os.path.exists(env_path):
-        print(f"Loading .env file from: {env_path}")
+        logging.info(f"Loading .env file from: {env_path}")
         load_dotenv(dotenv_path=env_path, override=True)
     else:
-        print(f"Warning: .env file not found at '{env_path}'. Environment variables might not be loaded.")
+        logging.warning(f".env file not found at '{env_path}'. Environment variables might not be loaded.")
     
 
 load_env_wrapper()
