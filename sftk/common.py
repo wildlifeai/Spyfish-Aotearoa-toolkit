@@ -16,16 +16,17 @@ def load_env_wrapper() -> None:
     if os.getenv("GITHUB_ACTIONS") == "true":
         return
 
-    # Construct the path to the .env file in your home directory
-    # The os.path.expanduser('~') command automatically gets your home directory path
-    env_path = os.path.expanduser('~/.env')
+    # Construct the path to the .env file in the project base directory.
+    # This assumes common.py is in a subdirectory of the project root.
+    project_root = Path(__file__).parent.parent
+    env_path = project_root / ".env"
     
     # Check if the file exists before trying to load it
     if os.path.exists(env_path):
         print(f"Loading .env file from: {env_path}")
         load_dotenv(dotenv_path=env_path, override=True)
     else:
-        print(f"Warning: .env file not found at {env_path}")
+        print(f"Warning: .env file not found at '{env_path}'. Environment variables might not be loaded.")
     
 
 load_env_wrapper()
