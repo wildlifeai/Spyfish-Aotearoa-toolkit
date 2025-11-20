@@ -315,12 +315,11 @@ class S3Handler:
             pd.DataFrame: The DataFrame read from the downloaded file.
 
         Raises:
-            S3FileNotFoundError: If other errors occur during download or reading.
+            S3FileNotFoundError: If errors occur during download or reading.
         """
         try:
-            if self.download_object_from_s3(key=key, filename=filename):
-                return pd.read_csv(filename)
-            raise S3FileNotFoundError(f"Failed to download S3 file {key}")
+            self.download_object_from_s3(key=key, filename=filename)
+            return pd.read_csv(filename)
         except Exception as e:
             logging.warning("Failed to process S3 file %s: %s", key, str(e))
             raise S3FileNotFoundError(
