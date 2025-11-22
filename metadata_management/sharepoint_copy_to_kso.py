@@ -21,13 +21,13 @@ import sftk.common
 
 # Import centralized logging configuration
 from sftk import log_config  # noqa: F401
-from sftk.common import DEV_MODE, S3_BUCKET
+from sftk.common import DEV_MODE
 from sftk.s3_handler import S3FileConfig, S3FileNotFoundError, S3Handler
 from sftk.utils import EnvironmentVariableError, temp_file_manager
 
 
 def process_s3_files(
-    s3_handler, keywords: list[str], bucket: str
+    s3_handler, keywords: list[str]
 ) -> dict[str, tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]]:
     """
     Downloads and reads KSO and SharePoint CSV files from S3 for given keywords.
@@ -35,7 +35,6 @@ def process_s3_files(
     Args:
         s3_handler: The S3 handler object. TODO if object, no need to pass this around
         keywords: A list of keywords to process.
-        bucket: The S3 bucket name.
 
     Returns:
         A dictionary mapping keywords to tuples of (KSO DataFrame, SharePoint DataFrame).
@@ -55,14 +54,12 @@ def process_s3_files(
                     kso_df = s3_handler.download_and_read_s3_file(
                         key=getattr(sftk.common, config.kso_env_var),
                         filename=config.kso_filename,
-                        bucket=bucket,
                     )
 
                     # Download and read Sharepoint file
                     sharepoint_df = s3_handler.download_and_read_s3_file(
                         key=getattr(sftk.common, config.sharepoint_env_var),
                         filename=config.sharepoint_filename,
-                        bucket=bucket,
                     )
 
                 except S3FileNotFoundError as e:
@@ -343,7 +340,6 @@ def compare_and_update_dataframes(
     kso_df: pd.DataFrame,
     sharepoint_df: pd.DataFrame,
     s3_handler: S3Handler,
-    bucket: str,
     keyword: str,
 ) -> pd.DataFrame:
     """
@@ -354,7 +350,6 @@ def compare_and_update_dataframes(
         kso_df: DataFrame containing KSO data.
         sharepoint_df: DataFrame containing Sharepoint data.
         s3_handler: S3Handler instance.
-        bucket: S3 bucket name.
         keyword: String identifier for the type of data (e.g., "survey", "site").
 
     """
@@ -511,7 +506,6 @@ def compare_and_update_dataframes(
                 df=updated_kso_df,
                 key=getattr(sftk.common, config.kso_env_var),
                 keyword=keyword,
-                bucket=bucket,
             )
             logging.info(f"Updated {keyword} DataFrame uploaded to S3")
         except Exception as e:
@@ -535,7 +529,7 @@ def main():
         logging.info("S3 handler initialized successfully")
 
         logging.info("Download and check S3 files...")
-        results = process_s3_files(s3_handler, keywords, S3_BUCKET)
+        results = process_s3_files(s3_handler, keywords)
         logging.info("S3 files were successfully downloaded and checked.")
 
         logging.info(
@@ -557,7 +551,6 @@ def main():
                     kso_df=kso_df,
                     sharepoint_df=sharepoint_df,
                     s3_handler=s3_handler,
-                    bucket=S3_BUCKET,
                     keyword=keyword,
                 )
 

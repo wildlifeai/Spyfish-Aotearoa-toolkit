@@ -14,7 +14,6 @@ import pandas as pd
 
 from sftk.common import (
     FILE_PRESENCE_RULES,
-    S3_BUCKET,
     S3_KSO_ERRORS_CSV,
     VALIDATION_PATTERNS,
     VALIDATION_RULES,
@@ -59,7 +58,6 @@ class DataValidator:
             errors_df (pd.DataFrame): DataFrame containing all validation errors
             patterns (dict): Regex patterns for format validation from VALIDATION_PATTERNS
             s3_handler (S3Handler): Handler for S3 operations
-            bucket (str): S3 bucket name from configuration
             validation_rules (dict): Loaded validation rules with associated reference datasets
             strategy_registry (ValidationStrategyRegistry): Registry for validation strategies
         """
@@ -67,7 +65,6 @@ class DataValidator:
         self.errors_df = None
         self.patterns = VALIDATION_PATTERNS
         self.s3_handler = S3Handler()
-        self.bucket = S3_BUCKET
         self.validation_rules = self._get_validation_rules()
         self.clean_row_tracker = None
         # Initialize with default max_errors, will be updated per validation run
@@ -259,28 +256,27 @@ class DataValidator:
 
     def _validate_file_presence(self, rules, strategy_registry):
         """
-        Handle file presence validation separately from regular dataset validation.
+                Handle file presence validation separately from regular dataset validation.
 
-        File presence validation compares video file paths referenced in CSV data
-        with actual files available in S3 storage, identifying missing and extra files.
-        This validation doesn't require a DataFrame as it works directly with S3.
+                File presence validation compares video file paths referenced in CSV data
+                with actual files available in S3 storage, identifying missing and extra files.
+                This validation doesn't require a DataFrame as it works directly with S3.
 
-        Args:
-            rules (dict): File presence validation rules containing:
-                - csv_filename: Path to CSV file with file references
-                - csv_column_to_extract: Column containing file paths
-                - column_filter: Column to filter on (optional)
-                - column_value: Value to filter by (optional)
-                - valid_extensions: List of valid file extensions
-                - path_prefix: S3 path prefix for files
-                - s3_sharepoint_path: SharePoint path in S3
-                - bucket: S3 bucket name
-            strategy_registry (ValidationStrategyRegistry): Registry containing
-                the file presence validator strategy
+                Args:
+                    rules (dict): File presence validation rules containing:
+                        - csv_filename: Path to CSV file with file references
+                        - csv_column_to_extract: Column containing file paths
+                        - column_filter: Column to filter on (optional)
+                        - column_value: Value to filter by (optional)
+                        - valid_extensions: List of valid file extensions
+                        - path_prefix: S3 path prefix for files
+                        - s3_sharepoint_path: SharePoint path in S3
+        =            strategy_registry (ValidationStrategyRegistry): Registry containing
+                        the file presence validator strategy
 
-        Side Effects:
-            - Extends self.errors with any file presence validation errors
-            - Logs validation start and completion
+                Side Effects:
+                    - Extends self.errors with any file presence validation errors
+                    - Logs validation start and completion
         """
         logging.info("Starting file presence validation.")
         file_presence_validator = strategy_registry.strategies.get("file_presence")
@@ -466,14 +462,13 @@ class DataValidator:
         Note:
             - Uses "errors" as the keyword for the upload operation
             - Uploads without the DataFrame index to keep the data clean
-            - Relies on S3_BUCKET and S3_KSO_ERRORS_CSV configuration constants
+            - Relies S3_KSO_ERRORS_CSV configuration constants
         """
         keyword = "errors"
         self.s3_handler.upload_updated_df_to_s3(
             df=self.errors_df,
             key=S3_KSO_ERRORS_CSV,
             keyword=keyword,
-            bucket=self.bucket,
             keep_df_index=False,
         )
         logging.info(f"Updated {keyword} DataFrame uploaded to S3")

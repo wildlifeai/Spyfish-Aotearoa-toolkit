@@ -539,7 +539,7 @@ class S3Handler:
             )
 
         logging.info("Found %d files in S3 matching criteria.", len(s3_filepaths))
-        return s3_filepaths
+        return set(s3_filepaths)
 
     def rename_s3_objects_from_dict(
         self,
