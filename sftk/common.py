@@ -1,8 +1,8 @@
-import os
 import logging
+import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from sftk.utils import str_to_bool
 
@@ -17,18 +17,16 @@ def load_env_wrapper() -> None:
     if os.getenv("GITHUB_ACTIONS") == "true":
         return
 
-    # Construct the path to the .env file in the project base directory.
-    # This assumes common.py is in a subdirectory of the project root.
-    project_root = Path(__file__).parent.parent
-    env_path = project_root / ".env"
-    
+    env_path = find_dotenv()
     # Check if the file exists before trying to load it
-    if os.path.exists(env_path):
+    if env_path:
         logging.info(f"Loading .env file from: {env_path}")
         load_dotenv(dotenv_path=env_path, override=True)
     else:
-        logging.warning(f".env file not found at '{env_path}'. Environment variables might not be loaded.")
-    
+        logging.warning(
+            f".env file not found at '{env_path}'. Environment variables might not be loaded."
+        )
+
 
 load_env_wrapper()
 
@@ -102,7 +100,7 @@ S3_KSO_ERRORS_CSV = os.path.join(S3_KSO_PATH, "errors_buv_doc.csv")
 S3_KSO_TEST_CSV = os.path.join(S3_KSO_PATH, "test_buv_doc.csv")
 
 
-# Specific Column names used in Sharepoint 
+# Specific Column names used in Sharepoint
 # TODO create variables for all columns used below
 DROPID_COLUMN = "DropID"
 REPLICATE_COLUMN = "ReplicateWithinSite"
@@ -135,7 +133,13 @@ VALIDATION_RULES = {
     "deployments": {
         "file_name": S3_SHAREPOINT_DEPLOYMENT_CSV,
         # TODO add fps, sampling start and end etc.
-        "required": [DROPID_COLUMN, "SurveyID", "SiteID", "FileName", "LinkToVideoFile"],
+        "required": [
+            DROPID_COLUMN,
+            "SurveyID",
+            "SiteID",
+            "FileName",
+            "LinkToVideoFile",
+        ],
         "unique": [DROPID_COLUMN],
         "info_columns": ["SurveyID", "SiteID"],
         "foreign_keys": {"surveys": "SurveyID", "sites": "SiteID"},
@@ -214,6 +218,8 @@ FILE_PRESENCE_RULES = {
         "csv_column_to_extract": "LinkToVideoFile",
         "column_filter": "IsBadDeployment",
         "column_value": False,
+        # "column_filter": None,
+        # "column_value": None,
         "valid_extensions": MOVIE_EXTENSIONS,
         "path_prefix": "media",
     }
@@ -225,5 +231,3 @@ VALIDATION_PATTERNS = {
     "SurveyID": r"^[A-Z]{3}_\d{8}_BUV$",
     "SiteID": r"^[A-Z]{3}_\d+$",
 }
-
-
