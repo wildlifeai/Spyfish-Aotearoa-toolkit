@@ -13,8 +13,8 @@ from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
 
-from sftk.utils import normalize_file_name
 from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+from sftk.utils import normalize_file_name
 
 
 class CleanRowTracker:
@@ -659,8 +659,10 @@ class RelationshipValidator(ValidationStrategy):
             )
 
         if rule == "equals" and str(actual) != str(expected):
-            # Check for specific DropID replicate mismatch case    
-            if col_name == DROPID_COLUMN and self._is_replicate_mismatch_only(str(actual), str(expected)):
+            # Check for specific DropID replicate mismatch case
+            if col_name == DROPID_COLUMN and self._is_replicate_mismatch_only(
+                str(actual), str(expected)
+            ):
                 message = f"{REPLICATE_COLUMN} mismatch: {col_name} should end with '{str(expected)[-2:]}' but ends with '{str(actual)[-2:]}'. Full {col_name} should be '{expected}', but is '{actual}'"
             else:
                 message = f"{col_name} should be '{expected}', but is '{actual}'"
@@ -829,7 +831,6 @@ class FilePresenceValidator(ValidationStrategy):
             csv_column=csv_column_to_extract,
             column_filter=column_filter,
             column_value=column_value,
-            s3_bucket=bucket,
         )
         csv_filepaths_all = csv_paths_result["all"]
         csv_filepaths_filtered = csv_paths_result["filtered"]

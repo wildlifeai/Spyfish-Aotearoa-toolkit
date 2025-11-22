@@ -19,10 +19,11 @@ Dependencies:
     - pandas: For data manipulation, especially reading CSVs from S3.
     - tqdm: For displaying progress bars during file transfers.
 """
+
+import datetime
 import io
 import logging
 import mimetypes
-import datetime
 import os
 import threading
 import time
@@ -31,11 +32,10 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 import boto3
-from boto3.s3.transfer import TransferConfig
 import pandas as pd
-from botocore.exceptions import BotoCoreError, ClientError
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
-
+from botocore.exceptions import BotoCoreError, ClientError
 
 from sftk.common import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
 from sftk.utils import (
@@ -87,8 +87,14 @@ class ProgressTracker:
         if self.total_size > 0:
             percent = (self.transferred / self.total_size) * 100
             elapsed = time.time() - self.start_time
-            speed_mbps = (self.transferred / (1024 * 1024)) / elapsed if elapsed > 0 else 0
-            eta_seconds = ((self.total_size - self.transferred) / (self.transferred / elapsed)) if self.transferred > 0 and elapsed > 0 else 0
+            speed_mbps = (
+                (self.transferred / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+            )
+            eta_seconds = (
+                ((self.total_size - self.transferred) / (self.transferred / elapsed))
+                if self.transferred > 0 and elapsed > 0
+                else 0
+            )
             # 1. Calculate the timedelta object
             eta_delta = datetime.timedelta(seconds=max(0, eta_seconds))
             # 2. Format the timedelta object into HH:MM:SS string
@@ -181,19 +187,21 @@ class S3Handler:
 
         self.bucket = bucket or S3_BUCKET
         if not self.bucket:
-            raise ValueError("S3_BUCKET environment variable not set or bucket not provided.")
+            raise ValueError(
+                "S3_BUCKET environment variable not set or bucket not provided."
+            )
 
         # Configure boto3 with larger connection pool
         boto_config = Config(
             max_pool_connections=50,  # Increase from default 10
-            retries={'max_attempts': 3, 'mode': 'adaptive'}
+            retries={"max_attempts": 3, "mode": "adaptive"},
         )
 
         self.s3 = s3_client or boto3.client(
             "s3",
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            config=boto_config  # Add config here
+            config=boto_config,  # Add config here
         )
         self._initialized = True
         logging.info("S3Handler initialized for bucket: %s", self.bucket)
@@ -208,11 +216,7 @@ class S3Handler:
         return f"S3Handler({self.s3})"
 
     def download_object_from_s3(
-        self,
-        key: str,
-        filename: str, 
-        callback=None,
-        version_id: Optional[str] = None
+        self, key: str, filename: str, callback=None, version_id: Optional[str] = None
     ) -> bool:
         """
         Downloads an object from S3 with progress bar and error handling.
@@ -248,9 +252,9 @@ class S3Handler:
         """
         if not key or not filename:
             raise ValueError("S3 key and local filename must be provided.")
-        
-        try:            
-            
+
+        try:
+
             kwargs: Dict[str, Any] = {"Bucket": self.bucket, "Key": key}
             if version_id:
                 kwargs["VersionId"] = version_id
@@ -263,11 +267,11 @@ class S3Handler:
 
             # Configure transfer for better performance with large files
             config = TransferConfig(
-                max_concurrency=5, 
+                max_concurrency=5,
                 multipart_threshold=8 * 1024 * 1024,
                 multipart_chunksize=8 * 1024 * 1024,
                 num_download_attempts=3,
-                use_threads=True
+                use_threads=True,
             )
 
             if callback:
@@ -277,7 +281,7 @@ class S3Handler:
                     Key=key,
                     Filename=filename,
                     Callback=callback,
-                    Config=config
+                    Config=config,
                 )
             else:
                 # Use tqdm progress bar (for interactive/sequential downloads)
@@ -287,12 +291,12 @@ class S3Handler:
                     Key=key,
                     Filename=filename,
                     Callback=progress,
-                    Config=config
+                    Config=config,
                 )
                 progress.complete()
-            
+
             return True
-            
+
         except BotoCoreError as e:
             logging.error("Failed to download %s from S3: %s", key, e)
             return False
@@ -300,10 +304,7 @@ class S3Handler:
             logging.error("Unexpected error downloading %s from S3: %s", key, e)
             return False
 
-
-    def download_and_read_s3_file(
-        self, key: str, filename: str
-    ) -> pd.DataFrame:
+    def download_and_read_s3_file(self, key: str, filename: str) -> pd.DataFrame:
         """
         Downloads an S3 object and reads it into a Pandas DataFrame.
 
@@ -332,7 +333,7 @@ class S3Handler:
         key: str,
         callback=None,
         delete_file_after_upload=False,
-        content_type: Optional[str] = None
+        content_type: Optional[str] = None,
     ) -> bool:
         """
         Uploads a file to S3 with progress bar and error handling.
@@ -360,7 +361,7 @@ class S3Handler:
         else:
             ct, _ = mimetypes.guess_type(filename)
             content_args = {"ContentType": ct or "application/octet-stream"}
-        
+
         try:
             file_size = os.path.getsize(filename)
             if callback:
@@ -392,11 +393,7 @@ class S3Handler:
                 delete_file(filename)
 
     def upload_updated_df_to_s3(
-        self,
-        df: pd.DataFrame,
-        key: str,
-        keyword: str,
-        keep_df_index=True
+        self, df: pd.DataFrame, key: str, keyword: str, keep_df_index=True
     ) -> None:
         """
         Upload an updated DataFrame to S3 with progress bar and error handling.
@@ -417,12 +414,12 @@ class S3Handler:
             delete_file(temp_filename)
 
     def get_file_paths_set_from_s3(
-        self,
-        prefix: str = "",
-        suffixes: tuple = ()
+        self, prefix: str = "", suffixes: tuple = ()
     ) -> Set[str]:
         """Retrieve a set of object keys from S3."""
-        keys = self.get_objects_from_s3(prefix, suffixes, keys_only=True, file_names_only=False)
+        keys = self.get_objects_from_s3(
+            prefix, suffixes, keys_only=True, file_names_only=False
+        )
         return keys if isinstance(keys, set) else set()
 
     def get_objects_from_s3(
@@ -452,10 +449,10 @@ class S3Handler:
                     if keys_only:
                         key = Path(obj["Key"]).name if file_names_only else obj["Key"]
                         # We know results is a set here
-                        results.add(key) # type: ignore
+                        results.add(key)  # type: ignore
                     else:
                         # We know results is a list here
-                        results.append(obj) # type: ignore
+                        results.append(obj)  # type: ignore
         return results
 
     def get_paths_from_csv(
@@ -463,7 +460,7 @@ class S3Handler:
         csv_s3_path: str,
         csv_column: str,
         column_filter: Optional[str] = None,
-        column_value: Optional[Any] = None,# type: ignore
+        column_value: Optional[Any] = None,  # type: ignore
     ) -> Dict[str, set]:
         """
         Extract unique file paths from a CSV file stored in S3.
@@ -533,9 +530,7 @@ class S3Handler:
         logging.info("Processing the files in the bucket: %s.", self.bucket)
 
         # Get all file paths currently in S3
-        s3_filepaths = self.get_file_paths_set_from_s3(
-            prefix=path_prefix
-        )
+        s3_filepaths = self.get_file_paths_set_from_s3(prefix=path_prefix)
 
         # Filter only video files based on their extension
         if valid_extensions:
@@ -544,43 +539,49 @@ class S3Handler:
             )
 
         logging.info("Found %d files in S3 matching criteria.", len(s3_filepaths))
-        return s3_filepaths
+        return set(s3_filepaths)
 
     def rename_s3_objects_from_dict(
         self,
-        rename_pairs: dict,
-        prefix="",
+        rename_pairs: Dict[str, str],
+        prefix: str = "",
         suffixes: Iterable = (),
-        try_run=False,
+        try_run: bool = False,
     ) -> None:
         files_from_aws = self.get_file_paths_set_from_s3(prefix, suffixes)
+        failed_renames = []
 
         for old_name, new_name in rename_pairs.items():
 
             if old_name in files_from_aws:
+                logging.info(f"⛭ Renaming: {old_name} ➜ {new_name}")
                 try:
                     if not try_run:
                         # Use the higher-level copy method which handles multipart copies for large files
-                        copy_source = {
-                            'Bucket': self.bucket,
-                            'Key': old_name
-                        }
+                        copy_source = {"Bucket": self.bucket, "Key": old_name}
                         self.s3.copy(copy_source, self.bucket, new_name)
                         # Delete the old object
                         self.s3.delete_object(Bucket=self.bucket, Key=old_name)
+                        logging.info(f"✅ Renamed: {old_name} ➜ {new_name}")
                 except BotoCoreError as e:
                     logging.warning(
                         f"Failed to rename {old_name} to {new_name}, error: {str(e)}"
                     )
-                logging.info(f"Renamed: {old_name} ➜ {new_name}")
+                    failed_renames.append(("BotoCoreError", old_name, new_name))
+                except ClientError as e:
+                    logging.warning(
+                        f"Failed to rename {old_name} to {new_name}, error: {str(e)}"
+                    )
+                    failed_renames.append(("ClientError", old_name, new_name))
             else:
                 logging.info(f"File not found in the {self.bucket} bucket: {old_name}.")
 
-        logging.info("Rename complete")
+        logging.info(
+            f"Rename complete, failed to rename {len(failed_renames)} out of {len(rename_pairs)} files."
+        )
+        logging.info(f"Failed renames: {failed_renames}")
 
-    def read_df_from_s3_csv(
-        self, csv_s3_path: str
-    ) -> pd.DataFrame:
+    def read_df_from_s3_csv(self, csv_s3_path: str) -> pd.DataFrame:
         """
         Downloads a CSV file from S3 and loads it into a pandas DataFrame.
 
@@ -596,7 +597,9 @@ class S3Handler:
             return pd.read_csv(io.BytesIO(response["Body"].read()))
         except BotoCoreError as e:
             logging.error("Failed to read CSV %s from S3: %s", csv_s3_path, e)
-            raise S3FileNotFoundError(f"Failed to read CSV {csv_s3_path} from S3: {e}") from e
+            raise S3FileNotFoundError(
+                f"Failed to read CSV {csv_s3_path} from S3: {e}"
+            ) from e
 
     def generate_presigned_url(self, key: str, expiration: int = 3600) -> Optional[str]:
         """
@@ -610,9 +613,11 @@ class S3Handler:
             Optional[str]: The presigned URL, or None if an error occurred.
         """
         try:
-            response = self.s3.generate_presigned_url('get_object',
-                                                      Params={'Bucket': self.bucket, 'Key': key},
-                                                      ExpiresIn=expiration)
+            response = self.s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": key},
+                ExpiresIn=expiration,
+            )
             return response
         except BotoCoreError as e:
             logging.error(f"Failed to generate presigned URL for {key}: {e}")
