@@ -11,7 +11,7 @@ st.set_page_config(
 )
 st.title("🐟  BIIGLE Annotation Fetcher")
 st.markdown(
-    "This app is used to retrieve and parse the annotation report from each of the Biigle clip groups.  \nIt allows you to export the MaxN total video, MaxN every 30 seconds, and size annotations.  \nFor more info on where to get the form values, check the help icons next to each entry.  \nIf there are any issues, or if it breaks please write an email to Kalindi, or open an issue on: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/issues"
+    "This app is used to retrieve and parse the annotation report from each of the Biigle clip groups.  \nIt allows you to export the MaxN total video, MaxN every 30 seconds, and size annotations.  \nFor more info on where to get the form values, check the help icons next to each entry.  \n This app is best for single deployment review, if you need bulk export reach out.  \n If there are any issues, or if it breaks please write an email to Kalindi, or open an issue on: https://github.com/wildlifeai/Spyfish-Aotearoa-toolkit/issues"
 )
 
 

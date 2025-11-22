@@ -127,7 +127,7 @@ def save_grabs_from_df(df, video_root, out_dir, *, fast=True, limit=None):
             )
             cmd += ["-frames:v", "1", "-q:v", "2", str(out_img)]
 
-            logging.info(f"[{i}] RUN:", " ".join(cmd))
+            logging.info("[%d] RUN: %s", i, " ".join(map(str, cmd)))
             subprocess.run(cmd, check=True)
 
             if not out_img.exists() or out_img.stat().st_size == 0:
