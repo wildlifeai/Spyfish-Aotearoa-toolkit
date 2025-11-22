@@ -543,7 +543,7 @@ class S3Handler:
 
     def rename_s3_objects_from_dict(
         self,
-        rename_pairs: dict,
+        rename_pairs: Dict[str, str],
         prefix: str = "",
         suffixes: Iterable = (),
         try_run: bool = False,

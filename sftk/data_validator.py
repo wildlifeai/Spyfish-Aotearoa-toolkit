@@ -256,27 +256,27 @@ class DataValidator:
 
     def _validate_file_presence(self, rules, strategy_registry):
         """
-                Handle file presence validation separately from regular dataset validation.
+        Handle file presence validation separately from regular dataset validation.
 
-                File presence validation compares video file paths referenced in CSV data
-                with actual files available in S3 storage, identifying missing and extra files.
-                This validation doesn't require a DataFrame as it works directly with S3.
+        File presence validation compares video file paths referenced in CSV data
+        with actual files available in S3 storage, identifying missing and extra files.
+        This validation doesn't require a DataFrame as it works directly with S3.
 
-                Args:
-                    rules (dict): File presence validation rules containing:
-                        - csv_filename: Path to CSV file with file references
-                        - csv_column_to_extract: Column containing file paths
-                        - column_filter: Column to filter on (optional)
-                        - column_value: Value to filter by (optional)
-                        - valid_extensions: List of valid file extensions
-                        - path_prefix: S3 path prefix for files
-                        - s3_sharepoint_path: SharePoint path in S3
-        =            strategy_registry (ValidationStrategyRegistry): Registry containing
-                        the file presence validator strategy
+        Args:
+            rules (dict): File presence validation rules containing:
+                - csv_filename: Path to CSV file with file references
+                - csv_column_to_extract: Column containing file paths
+                - column_filter: Column to filter on (optional)
+                - column_value: Value to filter by (optional)
+                - valid_extensions: List of valid file extensions
+                - path_prefix: S3 path prefix for files
+                - s3_sharepoint_path: SharePoint path in S3
+            strategy_registry (ValidationStrategyRegistry):
+                - Registry containing the file presence validator strategy
 
-                Side Effects:
-                    - Extends self.errors with any file presence validation errors
-                    - Logs validation start and completion
+        Side Effects:
+            - Extends self.errors with any file presence validation errors
+            - Logs validation start and completion
         """
         logging.info("Starting file presence validation.")
         file_presence_validator = strategy_registry.strategies.get("file_presence")
