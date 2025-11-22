@@ -60,7 +60,20 @@ echo 'export PYTHONPATH=$PYTHONPATH:path/to/Spyfish-Aotearoa-toolkit' >> ~/.bash
 ### Environment Variables
 Copy `.env_sample` to `.env` and fill in your own values:
 
+For the HPC environment, you need to create the .env File in Your Home Directory
+You can create and edit the file directly in your home directory using the terminal.
 
+#### Navigate to your home directory
+
+```bash
+cd $HOME
+```
+
+#### Create and open the .env file for editing
+```bash
+nano .env
+```
+Inside the editor, add your environment variables
 
 ## Collaborations
 
