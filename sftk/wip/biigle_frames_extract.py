@@ -127,7 +127,7 @@ def save_grabs_from_df(df, video_root, out_dir, *, fast=True, limit=None):
             )
             cmd += ["-frames:v", "1", "-q:v", "2", str(out_img)]
 
-            logging.info(f"[{i}] RUN:", " ".join(cmd))
+            logging.info("[%d] RUN: %s", i, " ".join(map(str, cmd)))
             subprocess.run(cmd, check=True)
 
             if not out_img.exists() or out_img.stat().st_size == 0:
@@ -148,12 +148,13 @@ def save_grabs_from_df(df, video_root, out_dir, *, fast=True, limit=None):
 
 if __name__ == "__main__":
     biigle_parser = BiigleParser()
-    # processed_annotations_df = biigle_parser.process_video_annotations(25516)
-    processed_annotations_df = biigle_parser.process_video_annotations(26577)
+    # processed_annotations_df = biigle_parser.process_video_annotations(25516, resource="volumes")
+    processed_annotations_df = biigle_parser.process_video_annotations(
+        26577, resource="volumes"
+    )
     print(processed_annotations_df)
 
     # processed_dfs = {
-    #         "drop_id": drop_id,
     #         "max_n_30s_df": max_n_30s_df,
     #         "max_n_df": max_n_df,
     #         "sizes_df": sizes_df,

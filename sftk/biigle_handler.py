@@ -24,20 +24,25 @@ Example usage:
 
 
     # Export annotations
-    annotations_df = biigle_handler.fetch_annotations_df(volume_id=12345)
+    annotations_df = biigle_handler.export_report_to_df(
+        resource="volumes", resource_id=12345
+    )
 """
 
 import io
 import logging
-import tempfile
+import time
 import zipfile
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import pandas as pd
+from requests.exceptions import HTTPError
 
 from sftk.common import BIIGLE_ANNOTATION_REPORT_TYPE, BIIGLE_DISK_ID, BIIGLE_PROJECT_ID
 from sftk.external.biigle_api import Api
+
+ResourceType = Literal["volumes", "projects"]
+MAX_DEPTH = 2
 
 
 class BiigleHandler:
@@ -48,7 +53,7 @@ class BiigleHandler:
         Initialize BiigleHandler with API credentials.
 
         Raises:
-            ValueError: If credentials are not provided and not found in environment.
+            Exception: If credentials are not provided and not found in environment.
         """
         self.email = email
         self.token = token
@@ -205,65 +210,190 @@ class BiigleHandler:
             logging.error(f"Failed to create label tree: {e}")
             raise
 
-    def fetch_annotations_df(
-        self, volume_id: int, type_id: int = BIIGLE_ANNOTATION_REPORT_TYPE
+    def create_report(
+        self,
+        resource: ResourceType,
+        resource_id: int,
+        type_id: int,
+    ) -> int:
+        """
+        Create a BIIGLE report for a volume or project.
+        Example endpoints:
+            volumes/{volume_id}/reports
+            projects/{project_id}/reports
+        """
+        resp = self.api.post(
+            f"{resource}/{resource_id}/reports", json={"type_id": type_id}
+        )
+        resp.raise_for_status()
+        report_id = resp.json()["id"]
+        logging.info(
+            f"Created report {report_id} for {resource.rstrip('s')} {resource_id} "
+            f"(type_id={type_id})"
+        )
+        return report_id
+
+    def download_report_zip_bytes(
+        self,
+        report_id: int,
+        max_tries: int = 60,  # e.g. up to 2 minutes if poll_interval=2
+        poll_interval: float = 2.0,
+    ) -> bytes:
+        """
+        Download the report ZIP by its ID and return raw bytes.
+
+        BIIGLE reports are generated asynchronously, so this polls the API until
+        the report file is available.
+
+        Endpoint: reports/{report_id}
+        """
+        for attempt in range(1, max_tries + 1):
+            # IMPORTANT: disable auto raise_for_status so we can handle 404 ourselves
+            resp = self.api.get(f"reports/{report_id}", raise_for_status=False)
+
+            status = resp.status_code
+
+            if status == 200:
+                logging.info(
+                    f"Downloaded ZIP for report {report_id} "
+                    f"after {attempt} attempt(s)."
+                )
+                return resp.content
+
+            # "Not ready yet" cases – BIIGLE may respond with 404 until generated
+            if status in (202, 404):
+                logging.info(
+                    f"Report {report_id} not ready yet (status {status}), "
+                    f"attempt {attempt}/{max_tries}. Waiting {poll_interval}s..."
+                )
+                time.sleep(poll_interval)
+                continue
+
+            # Any other status is treated as an actual error
+            try:
+                resp.raise_for_status()
+            except HTTPError as e:
+                logging.error(
+                    f"Error fetching report {report_id}: {e} "
+                    f"(status {status}, attempt {attempt})"
+                )
+                raise
+
+        raise TimeoutError(
+            f"Report {report_id} was not ready after "
+            f"{max_tries * poll_interval:.0f} seconds."
+        )
+
+    def read_csvs_from_zip_bytes(
+        self,
+        zip_bytes: bytes,
+        allow_nested: bool = True,
+        _depth: int = 0,
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Read all CSV files from a ZIP (given as bytes).
+
+        - If allow_nested=True, will also read CSVs from nested ZIPs.
+        - Returns { 'name.csv': DataFrame }.
+        """
+        csv_dfs: Dict[str, pd.DataFrame] = {}
+
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            for info in zf.infolist():
+                name = info.filename
+
+                # CSV directly inside this ZIP
+                if name.lower().endswith(".csv"):
+                    logging.info(f"Found CSV in ZIP: {name}")
+                    with zf.open(info) as f:
+                        csv_dfs[name] = pd.read_csv(f)
+
+                # Nested ZIP – recurse if allowed
+                elif (
+                    allow_nested
+                    and name.lower().endswith(".zip")
+                    and _depth < MAX_DEPTH
+                ):
+                    logging.info(f"Found nested ZIP in ZIP: {name}")
+                    nested_bytes = zf.read(name)
+                    nested_csvs = self.read_csvs_from_zip_bytes(
+                        zip_bytes=nested_bytes,
+                        allow_nested=allow_nested,
+                        _depth=_depth + 1,
+                    )
+
+                    for inner_name, inner_df in nested_csvs.items():
+                        csv_dfs[inner_name] = inner_df
+
+        return csv_dfs
+
+    def concat_csv_dict(
+        self,
+        csv_dfs: Dict[str, pd.DataFrame],
+        source_col: str = "source_file",
     ) -> pd.DataFrame:
         """
-        Create report for a volume, download its ZIP, extract CSV, and return a DataFrame.
+        Concatenate multiple CSV DataFrames into one, annotating
+        each row with its origin (key name) in a new column.
+        """
+        frames: List[pd.DataFrame] = []
+        for name, df in csv_dfs.items():
+            df = df.copy()
+            df[source_col] = name
+            frames.append(df)
+        if not frames:
+            raise FileNotFoundError("No CSV DataFrames to concatenate.")
+        return pd.concat(frames, ignore_index=True)
 
-        Note: if you want a local export of the biigle zip file/report, check your email with
-            the associated biigle address. Or use the streamlit app to get the processed reports.
+    def export_report_to_df(
+        self,
+        resource: ResourceType,
+        resource_id: int,
+        type_id: int = BIIGLE_ANNOTATION_REPORT_TYPE,
+        source_col: str = "source_file",
+    ) -> pd.DataFrame:
+        """
+        High-level exporter:
+
+        1. Create BIIGLE report for given resource (volume/project)
+        2. Download the report ZIP as bytes
+        3. Read all CSVs from the ZIP (optionally nested)
+        4. Concatenate them into a single DataFrame with a `source_col` that
+        indicates which CSV each row came from.
 
         Args:
-            volume_id: The ID of the volume to export annotations from.
-            type_id: The type ID for the report (default: 8 for annotations).
+            resource: "volumes" or "projects"
+            resource_id: volume_id or project_id
+            type_id: BIIGLE report type
+            source_col: name of the column that stores CSV origin
 
         Returns:
-            pd.DataFrame: DataFrame containing the annotation data.
-
-        Raises:
-            Exception: If the API call fails or file processing fails.
+            pd.DataFrame: concatenated DataFrame of all CSVs in the report.
         """
-        # Create annotation report
-        report_response = self.api.post(
-            f"volumes/{volume_id}/reports", json={"type_id": type_id}
+        # 1) Create report
+        report_id = self.create_report(resource, resource_id, type_id)
+
+        # 2) Download ZIP
+        zip_bytes = self.download_report_zip_bytes(report_id)
+
+        # 3) Read all CSVs (flat or nested)
+        allow_nested = resource == "projects"
+        csv_dict = self.read_csvs_from_zip_bytes(
+            zip_bytes=zip_bytes, allow_nested=allow_nested
         )
-        report_response.raise_for_status()
-        report_id = report_response.json()["id"]
-        logging.info(f"Created annotation report with ID: {report_id}")
 
-        # Download the report
-        download_response = self.api.get(f"reports/{report_id}")
-        download_response.raise_for_status()
+        if not csv_dict:
+            raise FileNotFoundError(
+                f"No CSV files found in report for {resource.rstrip('s')} {resource_id} for report_id {report_id}."
+            )
 
-        # Open the ZIP in-memory
-        with zipfile.ZipFile(io.BytesIO(download_response.content)) as zf:
-            # Extract to a temporary directory (auto-cleaned after use)
-            with tempfile.TemporaryDirectory() as tmp_root:
-                export_path = (
-                    Path(tmp_root)
-                    / "biigle_exports"
-                    / f"{volume_id}_biigle_annotations_raw"
-                )
-                export_path.mkdir(parents=True, exist_ok=True)
-                zf.extractall(export_path)
-                logging.info(f"Files extracted to (temp): {export_path}")
-
-                csv_files = sorted(export_path.glob("*.csv"))
-                if not csv_files:
-                    raise FileNotFoundError(f"No CSV files found in {export_path}.")
-
-                if len(csv_files) > 1:
-                    logging.warning(
-                        f"Multiple CSV files found: {[p.name for p in csv_files]}"
-                    )
-                    logging.info(f"Using the first one: {csv_files[0].name}")
-
-                df = pd.read_csv(csv_files[0])
-                logging.info(
-                    f"Loaded {len(df)} rows from the {csv_files[0].name} csv file."
-                )
-                return df
+        # 4) Concatenate and annotate with source filename
+        csv_df = self.concat_csv_dict(csv_dict, source_col=source_col)
+        logging.info(
+            f"Exported report for {resource.rstrip('s')} {resource_id}: "
+            f"{len(csv_dict)} CSV(s), {len(csv_df)} total rows."
+        )
+        return csv_df
 
     def get_volumes(self, project_id: int = BIIGLE_PROJECT_ID) -> List[Dict[str, Any]]:
         """

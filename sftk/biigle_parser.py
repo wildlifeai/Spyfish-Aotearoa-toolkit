@@ -1,19 +1,22 @@
 import logging
 import math
-import re
 from typing import Optional
 
 import pandas as pd
 
 from sftk.biigle_handler import BiigleHandler
-from sftk.common import BIIGLE_API_EMAIL, BIIGLE_API_TOKEN
+from sftk.common import (
+    BIIGLE_ANNOTATION_REPORT_TYPE,
+    BIIGLE_API_EMAIL,
+    BIIGLE_API_TOKEN,
+)
 
 SCALE_BAR_LENGTH_CM = 10
 SCALE_BAR_LABEL_NAME = "Scale bar"
 
 
 class BiigleParser:
-    """Handler for BIIGLE API operations."""
+    """Parser for processing BIIGLE annotation data."""
 
     def __init__(
         self,
@@ -25,14 +28,27 @@ class BiigleParser:
     def process_video_annotations(
         self,
         volume_id: int,
+        resource: str,
+        export_raw: bool = False,
+        type_id: int = BIIGLE_ANNOTATION_REPORT_TYPE,
     ) -> dict[str, pd.DataFrame | str]:
-        annotations_df = self.biigle_handler.fetch_annotations_df(volume_id=volume_id)
+        annotations_df = self.biigle_handler.export_report_to_df(
+            resource=resource, resource_id=volume_id, type_id=type_id
+        )
 
         if annotations_df.empty:
             logging.info(f"No data found, seems like volume {volume_id} is empty. ")
             return {}
 
+        annotations_df["DropID"] = annotations_df["video_filename"].str.replace(
+            r"\.mp4.*", "", regex=True
+        )
+
+        if export_raw:
+            return {"raw_annotations_df": annotations_df}
+
         required_columns = [
+            "DropID",
             "label_name",
             "video_id",
             "video_filename",
@@ -43,14 +59,8 @@ class BiigleParser:
         ]
 
         annotations_df = annotations_df[required_columns]
-
-        drop_id = re.sub(r"\.mp4.*", "", annotations_df["video_filename"].iloc[0])
-        annotations_df["DropID"] = drop_id
-
         annotations_df = self.extract_time_values(annotations_df)
 
-        # TODO check sorting and time, not doing it for every single df...
-        # sort df based on time:
         annotations_df = annotations_df.sort_values(
             by=["video_filename", "start_seconds", "frame_seconds"],
             ascending=[True, True, True],
@@ -61,14 +71,11 @@ class BiigleParser:
         sizes_df = self.process_sizes(annotations_df)
 
         processed_dfs = {
-            "drop_id": drop_id,
             "max_n_30s_df": max_n_30s_df,
             "max_n_df": max_n_df,
             "sizes_df": sizes_df,
         }
-        logging.info(
-            f"Processed annotations for volume {volume_id} with DropID {drop_id}"
-        )
+        logging.info(f"Processed annotations for {resource} {volume_id}.")
 
         return processed_dfs
 
@@ -82,6 +89,7 @@ class BiigleParser:
         grouped_df = (
             count_df.groupby(
                 [
+                    "DropID",
                     "video_filename",
                     "label_name",
                     "start_seconds",
@@ -107,13 +115,13 @@ class BiigleParser:
         """
         # Ensure correct ordering: highest count first, earliest frame/time in case of ties
         ordered_annotations_df = annotations_df.sort_values(
-            ["max_count", "start_seconds", "frame_seconds"],
-            ascending=[False, True, True],
+            ["DropID", "max_count", "start_seconds", "frame_seconds"],
+            ascending=[True, False, True, True],
         )
 
         # Drop duplicates, keeping only the "first" occurrence per video/species
         result_df = ordered_annotations_df.drop_duplicates(
-            subset=["label_name"], keep="first"
+            subset=["DropID", "label_name"], keep="first"
         )
 
         result_df = result_df.sort_values(
@@ -146,6 +154,7 @@ class BiigleParser:
 
         return sizes_df[
             [
+                "DropID",
                 "label_name",
                 "video_filename",
                 "start_seconds",
@@ -195,7 +204,7 @@ class BiigleParser:
         return annotations_df
 
     def format_count_annotations_output(
-        self, annotations_df: pd.DataFrame
+        self, annotations_df: pd.DataFrame, interval_annotation_s: int = 30
     ) -> pd.DataFrame:
         annotations_df["ScientificName"] = (
             annotations_df["label_name"]
@@ -210,7 +219,7 @@ class BiigleParser:
         )
         # Add constant columns (may change according to video)
         renamed_df["AnnotatedBy"] = "expert"
-        renamed_df["IntervalAnnotation"] = 30
+        renamed_df["IntervalAnnotation"] = interval_annotation_s
         renamed_df["ConfidenceAgreement"] = "NA"
 
         # Select and reorder final columns
@@ -231,6 +240,8 @@ class BiigleParser:
 
 if __name__ == "__main__":
     biigle_parser = BiigleParser()
-    # processed_annotations_df = biigle_parser.process_video_annotations(25516)
-    processed_annotations_df = biigle_parser.process_video_annotations(26577)
+    # processed_annotations_df = biigle_parser.process_video_annotations(25516, resource="volumes")
+    processed_annotations_df = biigle_parser.process_video_annotations(
+        26577, resource="volumes"
+    )
     print(processed_annotations_df)
