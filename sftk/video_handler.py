@@ -23,47 +23,42 @@ def _extract_gopro_sequence_id(
     filename: str, gopro_prefix: str = "GX"
 ) -> Optional[str]:
     """
-    Extract the sequence ID from a GoPro or Orau filename.
+    Extract the sequence ID from a filename based on the underscore-number pattern.
 
     Supports multiple naming patterns:
-        Standard GoPro:
+        Underscore format (primary):
+        - TUK_1.MP4 -> "1"
+        - TUK_2.MP4 -> "2"
+        - TUK_10.MP4 -> "10"
+        - Orau_NR_E1_1.MP4 -> "1"
+        - Orau_NR_E1_2.MP4 -> "2"
+
+        Standard GoPro (fallback):
         - GOPR0298.MP4 -> "0298"
         - GP010298.MP4 -> "0298"
-        - GP020392.MP4 -> "0392"
         - GX010425.MP4 -> "0425"
-        - GH010298.MP4 -> "0298"
-        - GL010298.MP4 -> "0298"
-
-        Other format:
-        - Orau_NR_E1_1A.MP4 -> "1"
-        - Orau_NR_E1_1B.MP4 -> "1"
-        - Orau_NR_E1_1C.MP4 -> "1"
-        - Orau_NR_E1_2A.MP4 -> "2"
 
     Args:
         filename: The filename to parse
-        gopro_prefix: The prefix to look for (e.g., "GX", "Orau_")
+        gopro_prefix: The prefix to look for (e.g., "TUK", "Orau_", "GX")
 
     Returns:
         The sequence ID, or None if not a valid format
     """
-    # Handle Orau_ format
-    if gopro_prefix == "Orau_":
-        # Pattern: Orau_*_*_<number><letter>.MP4
-        # Extract just the numeric part before the letter suffix
-        pattern = r"^Orau_.*_(\d+)[A-Z]\.MP4$"
-        match = re.match(pattern, filename, re.IGNORECASE)
-        if match:
-            return match.group(1)  # Return just the number (e.g., "1" from "1A")
-        return None
-
-    # Handle standard GoPro format
-    # Match GoPro pattern: GOPR or G[A-Z][0-9][0-9] followed by 4 digits
-    pattern = rf"^(GOPR|G[A-Z]\d{{2}})(\d{{4}})\.MP4$"
-    match = re.match(pattern, filename, re.IGNORECASE)
-
+    # Primary pattern: Extract number after the last underscore before extension
+    # Pattern: *_<number>.MP4
+    pattern = r"_(\d+)\.MP4$"
+    match = re.search(pattern, filename, re.IGNORECASE)
     if match:
-        return match.group(2)  # Return the 4-digit sequence ID
+        return match.group(1)  # Return the number after the last underscore
+    
+    # Fallback to standard GoPro format if underscore pattern not found
+    # Match GoPro pattern: GOPR or G[A-Z][0-9][0-9] followed by 4 digits
+    gopro_pattern = rf"^(GOPR|G[A-Z]\d{{2}})(\d{{4}})\.MP4$"
+    gopro_match = re.match(gopro_pattern, filename, re.IGNORECASE)
+    if gopro_match:
+        return gopro_match.group(2)  # Return the 4-digit sequence ID
+    
     return None
 
 
