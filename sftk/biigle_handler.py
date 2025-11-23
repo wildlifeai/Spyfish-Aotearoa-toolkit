@@ -24,7 +24,9 @@ Example usage:
 
 
     # Export annotations
-    annotations_df = biigle_handler.fetch_annotations_df(volume_id=12345)
+    annotations_df = biigle_handler.export_report_to_df(
+        resource="volumes", resource_id=12345
+    )
 """
 
 import io
@@ -51,7 +53,7 @@ class BiigleHandler:
         Initialize BiigleHandler with API credentials.
 
         Raises:
-            ValueError: If credentials are not provided and not found in environment.
+            Exception: If credentials are not provided and not found in environment.
         """
         self.email = email
         self.token = token
@@ -360,7 +362,6 @@ class BiigleHandler:
         indicates which CSV each row came from.
 
         Args:
-            api: requests-like API client with .get() and .post()
             resource: "volumes" or "projects"
             resource_id: volume_id or project_id
             type_id: BIIGLE report type
@@ -387,9 +388,7 @@ class BiigleHandler:
             )
 
         # 4) Concatenate and annotate with source filename
-        csv_df = self.concat_csv_dict(
-            csv_dict, source_col=source_col
-        )  # TODO do i need this source col
+        csv_df = self.concat_csv_dict(csv_dict, source_col=source_col)
         logging.info(
             f"Exported report for {resource.rstrip('s')} {resource_id}: "
             f"{len(csv_dict)} CSV(s), {len(csv_df)} total rows."

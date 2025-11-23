@@ -16,7 +16,7 @@ SCALE_BAR_LABEL_NAME = "Scale bar"
 
 
 class BiigleParser:
-    """Handler for BIIGLE API operations."""
+    """Parser for processing BIIGLE annotation data."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class BiigleParser:
     def process_video_annotations(
         self,
         volume_id: int,
-        resource="volumes",  # TODO add volumes for backwards compatibility
+        resource: str,
         export_raw: bool = False,
         type_id: int = BIIGLE_ANNOTATION_REPORT_TYPE,
     ) -> dict[str, pd.DataFrame | str]:
@@ -61,8 +61,6 @@ class BiigleParser:
         annotations_df = annotations_df[required_columns]
         annotations_df = self.extract_time_values(annotations_df)
 
-        # TODO check sorting and time, not doing it for every single df...
-        # sort df based on time:
         annotations_df = annotations_df.sort_values(
             by=["video_filename", "start_seconds", "frame_seconds"],
             ascending=[True, True, True],
@@ -242,6 +240,8 @@ class BiigleParser:
 
 if __name__ == "__main__":
     biigle_parser = BiigleParser()
-    # processed_annotations_df = biigle_parser.process_video_annotations(25516)
-    processed_annotations_df = biigle_parser.process_video_annotations(26577)
+    # processed_annotations_df = biigle_parser.process_video_annotations(25516, resource="volumes")
+    processed_annotations_df = biigle_parser.process_video_annotations(
+        26577, resource="volumes"
+    )
     print(processed_annotations_df)
