@@ -979,7 +979,6 @@ class VideoProcessor:
                             self.test_mode,
                             self.download_threads,  # Updated variable name
                             self.sequential_download,
-                            self.s3_handler.bucket,
                             self.ffmpeg_path,
                             self.gopro_prefix,
                             log_queue,
@@ -1022,7 +1021,6 @@ class VideoProcessor:
                             self.test_mode,
                             self.download_threads,
                             self.sequential_download,
-                            self.s3_handler.bucket,  # Pass bucket name
                             self.ffmpeg_path,
                             self.gopro_prefix,
                             None,
