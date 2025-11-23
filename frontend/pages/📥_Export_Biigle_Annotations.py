@@ -35,7 +35,7 @@ else:
             placeholder="Enter volume ID (number)",
             help="ID of the BIIGLE volume you want to download",
             key="volume_id",
-        )
+        ).strip()
 
 
 with st.form("biigle_form"):
