@@ -76,7 +76,6 @@ if submitted:
                 st.stop()
 
             # Extract dataframes
-            drop_id = processed.get("drop_id")
             max_n_30s_df = processed.get("max_n_30s_df")
             max_n_df = processed.get("max_n_df")
             sizes_df = processed.get("sizes_df")
@@ -96,7 +95,7 @@ if submitted:
                 else:
                     st.info(f"No data available for **{label}**.")
 
-            st.success(f"Loaded annotations for {drop_id}")
+            st.success(f"Loaded annotations.")
 
             # TODO add some graphs here
             tab1, tab2, tab3 = st.tabs(
@@ -104,17 +103,17 @@ if submitted:
             )
             with tab1:
                 _render_df_section(
-                    max_n_df, "Max N of whole video", f"annotations_{drop_id}_max_n.csv"
+                    max_n_df, "Max N of whole video", f"annotations_{volume_id_str}_max_n.csv"
                 )
             with tab2:
                 _render_df_section(
                     max_n_30s_df,
                     "Max N every 30 seconds",
-                    f"annotations_{drop_id}_max_n_30s.csv",
+                    f"annotations_{volume_id_str}_max_n_30s.csv",
                 )
             with tab3:
                 _render_df_section(
-                    sizes_df, "Sizes (if annotated)", f"annotations_{drop_id}_sizes.csv"
+                    sizes_df, "Sizes (if annotated)", f"annotations_{volume_id_str}_sizes.csv"
                 )
         except Exception as e:
             st.error(f"An error occurred while fetching annotations: {e}")
