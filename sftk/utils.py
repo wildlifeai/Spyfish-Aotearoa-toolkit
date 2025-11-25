@@ -96,7 +96,7 @@ def get_env_var(name: str) -> str:
 def str_to_bool(value: Optional[str]) -> bool:
     if value is None:
         return False
-    return value.strip().lower() in ("true")
+    return value.strip().lower() == "true"
 
 
 def delete_file(filename: str):

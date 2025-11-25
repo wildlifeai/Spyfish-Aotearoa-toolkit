@@ -1,104 +1,20 @@
-import sys
-from unittest.mock import MagicMock, Mock, mock_open, patch
+import io
+import zipfile
+from unittest.mock import Mock, patch
 
-import pytest
-
-pytest.skip("Skipping this file", allow_module_level=True)
+import pandas as pd
 
 
 class TestBiigleHandlerInitialization:
     """Test BiigleHandler initialization and API connection setup."""
 
-    def test_biigle_handler_initialization_with_credentials(self):
-        """Test that BiigleHandler initializes correctly with API credentials."""
-        # Arrange
-        mock_api_instance = Mock()
-        mock_api_class = Mock(return_value=mock_api_instance)
-
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
-
-            email = "test@example.com"
-            token = "test_token"
-
-            # Act
-            handler = BiigleHandler(email, token)
-
-            # Assert
-            mock_api_class.assert_called_once_with(email, token)
-            assert handler.api == mock_api_instance
-            assert handler.email == email
-            assert handler.token == token
-
-    @patch("sftk.common.BIIGLE_API_EMAIL", "env_email@example.com")
-    @patch("sftk.common.BIIGLE_API_TOKEN", "env_token")
-    def test_biigle_handler_initialization_with_env_credentials(self):
-        """Test that BiigleHandler uses environment credentials when none provided."""
-        # Arrange
-        mock_api_instance = Mock()
-        mock_api_class = Mock(return_value=mock_api_instance)
-
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
-
-            # Act
-            handler = BiigleHandler()
-
-            # Assert
-            mock_api_class.assert_called_once_with("env_email@example.com", "env_token")
-            assert handler.api == mock_api_instance
-            assert handler.email == "env_email@example.com"
-            assert handler.token == "env_token"
-
-    def test_biigle_handler_initialization_missing_credentials(self):
-        """Test that BiigleHandler raises error when credentials are missing."""
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            with (
-                patch("sftk.common.BIIGLE_API_EMAIL", None),
-                patch("sftk.common.BIIGLE_API_TOKEN", None),
-            ):
-                from sftk.biigle_handler import BiigleHandler
-
-                # Act & Assert
-                with pytest.raises(
-                    ValueError, match="BIIGLE API credentials are required"
-                ):
-                    BiigleHandler(None, None)
-
-    def test_biigle_handler_initialization_api_connection_failure(self):
-        """Test that BiigleHandler handles API connection failures gracefully."""
-        # Arrange
-        mock_api_class = Mock(side_effect=Exception("API connection failed"))
-
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
-
-            # Act & Assert
-            with pytest.raises(Exception, match="Failed to initialize BIIGLE API"):
-                BiigleHandler("test@example.com", "test_token")
-
 
 class TestBiigleHandlerGetProjects:
     """Test BiigleHandler get_projects method."""
 
-    def test_get_projects_returns_list_of_projects(self):
+    @patch("sftk.external.biigle_api.Api")
+    def test_get_projects_returns_list_of_projects(self, mock_api_class):
         """Test that get_projects returns a list of accessible projects."""
-        # Arrange
         mock_response = Mock()
         mock_response.json.return_value = [
             {"id": 1, "name": "Project 1", "description": "Test project 1"},
@@ -107,47 +23,46 @@ class TestBiigleHandlerGetProjects:
 
         mock_api_instance = Mock()
         mock_api_instance.get.return_value = mock_response
-        mock_api_class = Mock(return_value=mock_api_instance)
+        mock_api_class.return_value = mock_api_instance
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
+        from sftk.biigle_handler import BiigleHandler
 
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
+        handler = BiigleHandler("test@example.com", "test_token")
+        projects = handler.get_projects()
 
-            handler = BiigleHandler("test@example.com", "test_token")
+        mock_api_instance.get.assert_called_once_with("projects")
+        assert len(projects) == 2
+        assert projects[0]["id"] == 1
+        assert projects[0]["name"] == "Project 1"
+        assert projects[1]["id"] == 2
+        assert projects[1]["name"] == "Project 2"
 
-            # Act
-            projects = handler.get_projects()
 
-            # Assert
-            mock_api_instance.get.assert_called_once_with("projects")
-            assert len(projects) == 2
-            assert projects[0]["id"] == 1
-            assert projects[0]["name"] == "Project 1"
-            assert projects[1]["id"] == 2
-            assert projects[1]["name"] == "Project 2"
+class TestBiigleHandlerGetVolumes:
+    """Test BiigleHandler get_volumes method."""
 
-    def test_get_projects_handles_api_error(self):
-        """Test that get_projects handles API errors gracefully."""
-        # Arrange
+    def test_get_volumes_returns_list_of_volumes(self):
+        """Test that get_volumes returns a list of volumes from a project."""
+        mock_response = Mock()
+        mock_response.json.return_value = [
+            {"id": 1, "name": "Volume 1"},
+            {"id": 2, "name": "Volume 2"},
+        ]
+
         mock_api_instance = Mock()
-        mock_api_instance.get.side_effect = Exception("API error")
+        mock_api_instance.get.return_value = mock_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
+            volumes = handler.get_volumes(project_id=3711)
 
-            # Act & Assert
-            with pytest.raises(Exception, match="API error"):
-                handler.get_projects()
+            mock_api_instance.get.assert_called_once_with("projects/3711/volumes")
+            assert len(volumes) == 2
+            assert volumes[0]["id"] == 1
+            assert volumes[0]["name"] == "Volume 1"
 
 
 class TestBiigleHandlerCreatePendingVolume:
@@ -155,7 +70,6 @@ class TestBiigleHandlerCreatePendingVolume:
 
     def test_create_pending_volume_success(self):
         """Test that create_pending_volume creates a new pending volume successfully."""
-        # Arrange
         mock_response = Mock()
         mock_response.json.return_value = {"id": 12345, "name": None, "url": None}
 
@@ -163,28 +77,19 @@ class TestBiigleHandlerCreatePendingVolume:
         mock_api_instance.post.return_value = mock_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
-            project_id = 3711
+            pending_volume = handler.create_pending_volume(project_id=3711)
 
-            # Act
-            pending_volume = handler.create_pending_volume(project_id)
-
-            # Assert
             mock_api_instance.post.assert_called_once_with(
-                f"projects/{project_id}/pending-volumes", json={"media_type": "video"}
+                "projects/3711/pending-volumes", json={"media_type": "video"}
             )
             assert pending_volume["id"] == 12345
 
     def test_create_pending_volume_with_media_type(self):
         """Test that create_pending_volume accepts custom media type."""
-        # Arrange
         mock_response = Mock()
         mock_response.json.return_value = {"id": 12345, "name": None, "url": None}
 
@@ -192,46 +97,18 @@ class TestBiigleHandlerCreatePendingVolume:
         mock_api_instance.post.return_value = mock_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
-            project_id = 3711
-
-            # Act
             pending_volume = handler.create_pending_volume(
-                project_id, media_type="image"
+                project_id=3711, media_type="image"
             )
 
-            # Assert
             mock_api_instance.post.assert_called_once_with(
-                f"projects/{project_id}/pending-volumes", json={"media_type": "image"}
+                "projects/3711/pending-volumes", json={"media_type": "image"}
             )
             assert pending_volume["id"] == 12345
-
-    def test_create_pending_volume_api_error(self):
-        """Test that create_pending_volume handles API errors gracefully."""
-        # Arrange
-        mock_api_instance = Mock()
-        mock_api_instance.post.side_effect = Exception("API error")
-        mock_api_class = Mock(return_value=mock_api_instance)
-
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
-
-            handler = BiigleHandler("test@example.com", "test_token")
-
-            # Act & Assert
-            with pytest.raises(Exception, match="API error"):
-                handler.create_pending_volume(3711)
 
 
 class TestBiigleHandlerSetupVolumeWithFiles:
@@ -239,7 +116,6 @@ class TestBiigleHandlerSetupVolumeWithFiles:
 
     def test_setup_volume_with_files_success(self):
         """Test that setup_volume_with_files configures pending volume successfully."""
-        # Arrange
         mock_response = Mock()
         mock_response.json.return_value = {
             "id": 12345,
@@ -251,11 +127,7 @@ class TestBiigleHandlerSetupVolumeWithFiles:
         mock_api_instance.put.return_value = mock_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
@@ -267,12 +139,10 @@ class TestBiigleHandlerSetupVolumeWithFiles:
             )
             files = ["file1.mp4", "file2.mp4"]
 
-            # Act
             result = handler.setup_volume_with_files(
                 pending_volume_id, volume_name, s3_url, files
             )
 
-            # Assert
             expected_payload = {"name": volume_name, "url": s3_url, "files": files}
             mock_api_instance.put.assert_called_once_with(
                 f"pending-volumes/{pending_volume_id}", json=expected_payload
@@ -280,27 +150,42 @@ class TestBiigleHandlerSetupVolumeWithFiles:
             assert result["id"] == 12345
             assert result["name"] == "test_volume"
 
-    def test_setup_volume_with_files_api_error(self):
-        """Test that setup_volume_with_files handles API errors gracefully."""
-        # Arrange
+
+class TestBiigleHandlerCreateVolumeFromS3Files:
+    """Test BiigleHandler create_volume_from_s3_files convenience method."""
+
+    def test_create_volume_from_s3_files_success(self):
+        """Test that create_volume_from_s3_files creates and configures volume."""
+        mock_pending_response = Mock()
+        mock_pending_response.json.return_value = {"id": 12345}
+
+        mock_setup_response = Mock()
+        mock_setup_response.json.return_value = {
+            "id": 12345,
+            "name": "test_volume",
+        }
+
         mock_api_instance = Mock()
-        mock_api_instance.put.side_effect = Exception("API error")
+        mock_api_instance.post.return_value = mock_pending_response
+        mock_api_instance.put.return_value = mock_setup_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
 
-            # Act & Assert
-            with pytest.raises(Exception, match="API error"):
-                handler.setup_volume_with_files(
-                    12345, "test", "s3://test", ["file1.mp4"]
-                )
+            result = handler.create_volume_from_s3_files(
+                project_id=3711,
+                volume_name="test_volume",
+                s3_url="disk-98://biigle_clips/test/",
+                files=["file1.mp4", "file2.mp4"],
+            )
+
+            assert result["id"] == 12345
+            assert result["name"] == "test_volume"
+            assert mock_api_instance.post.call_count == 1
+            assert mock_api_instance.put.call_count == 1
 
 
 class TestBiigleHandlerCreateLabelTree:
@@ -308,7 +193,6 @@ class TestBiigleHandlerCreateLabelTree:
 
     def test_create_label_tree_success(self):
         """Test that create_label_tree creates label tree and adds labels successfully."""
-        # Arrange
         mock_tree_response = Mock()
         mock_tree_response.json.return_value = {"id": 456, "name": "Test Tree"}
 
@@ -323,283 +207,281 @@ class TestBiigleHandlerCreateLabelTree:
         ]
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module and pandas
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
+        # Create actual DataFrame for CSV
+        labels_df = pd.DataFrame(
+            {
+                "name": ["Species 1", "Species 2"],
+                "color": ["FF0000", "00FF00"],
+                "source_id": [123, 456],
+            }
+        )
 
-        # Mock pandas DataFrame
-        mock_df = Mock()
-        mock_df.iterrows.return_value = [
-            (0, {"name": "Species 1", "color": "FF0000", "source_id": 123}),
-            (1, {"name": "Species 2", "color": "00FF00", "source_id": 456}),
-        ]
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            with patch("pandas.read_csv", return_value=mock_df):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
+            with patch("pandas.read_csv", return_value=labels_df):
                 from sftk.biigle_handler import BiigleHandler
 
                 handler = BiigleHandler("test@example.com", "test_token")
 
-                project_id = 3711
-                csv_path = "test_labels.csv"
-                tree_name = "Test Tree"
-                tree_description = "Test Description"
-
-                # Act
                 result = handler.create_label_tree(
-                    project_id, csv_path, tree_name, tree_description
+                    csv_path="test_labels.csv",
+                    tree_name="Test Tree",
+                    tree_description="Test Description",
+                    project_id=3711,
                 )
 
-                # Assert
-                # Check label tree creation
+                # Check label tree creation (visibility_id should be 2, not 1)
                 expected_tree_config = {
-                    "name": tree_name,
-                    "description": tree_description,
-                    "visibility_id": 1,
-                    "project_id": project_id,
+                    "name": "Test Tree",
+                    "description": "Test Description",
+                    "visibility_id": 2,  # Private by default
+                    "project_id": 3711,
                 }
                 mock_api_instance.post.assert_any_call(
                     "label-trees", json=expected_tree_config
                 )
 
-                # Check label creation calls
-                expected_label_calls = [
-                    (
-                        "label-trees/456/labels",
-                        {
-                            "json": {
-                                "name": "Species 1",
-                                "color": "FF0000",
-                                "source_id": 123,
-                            }
-                        },
-                    ),
-                    (
-                        "label-trees/456/labels",
-                        {
-                            "json": {
-                                "name": "Species 2",
-                                "color": "00FF00",
-                                "source_id": 456,
-                            }
-                        },
-                    ),
-                ]
-
+                # Check that labels were created
                 assert mock_api_instance.post.call_count == 3  # 1 tree + 2 labels
                 assert result["tree_id"] == 456
                 assert len(result["labels"]) == 2
 
-    def test_create_label_tree_api_error(self):
-        """Test that create_label_tree handles API errors gracefully."""
-        # Arrange
+
+class TestBiigleHandlerCreateReport:
+    """Test BiigleHandler create_report method."""
+
+    def test_create_report_success(self):
+        """Test that create_report creates a report and returns report_id."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"id": 999}
+        mock_response.raise_for_status = Mock()
+
         mock_api_instance = Mock()
-        mock_api_instance.post.side_effect = Exception("API error")
+        mock_api_instance.post.return_value = mock_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
 
-            # Act & Assert
-            with pytest.raises(Exception, match="API error"):
-                handler.create_label_tree(3711, "test.csv", "Test", "Description")
+            report_id = handler.create_report("volumes", resource_id=12345, type_id=8)
+
+            mock_api_instance.post.assert_called_once_with(
+                "volumes/12345/reports", json={"type_id": 8}
+            )
+            assert report_id == 999
 
 
-class TestBiigleHandlerExportAnnotations:
-    """Test BiigleHandler export_annotations method."""
+class TestBiigleHandlerDownloadReportZipBytes:
+    """Test BiigleHandler download_report_zip_bytes method."""
 
-    def test_export_annotations_success(self):
-        """Test that export_annotations downloads and processes annotations successfully."""
-        # Arrange
+    def test_download_report_zip_bytes_success_immediate(self):
+        """Test that download_report_zip_bytes downloads ZIP when ready immediately."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"fake zip content"
+
+        mock_api_instance = Mock()
+        mock_api_instance.get.return_value = mock_response
+        mock_api_class = Mock(return_value=mock_api_instance)
+
+        with patch("sftk.biigle_handler.Api", mock_api_class):
+            from sftk.biigle_handler import BiigleHandler
+
+            handler = BiigleHandler("test@example.com", "test_token")
+
+            zip_bytes = handler.download_report_zip_bytes(report_id=999)
+
+            mock_api_instance.get.assert_called_once_with(
+                "reports/999", raise_for_status=False
+            )
+            assert zip_bytes == b"fake zip content"
+
+    def test_download_report_zip_bytes_with_polling(self):
+        """Test that download_report_zip_bytes polls until report is ready."""
+        mock_not_ready = Mock()
+        mock_not_ready.status_code = 404
+
+        mock_ready = Mock()
+        mock_ready.status_code = 200
+        mock_ready.content = b"fake zip content"
+
+        mock_api_instance = Mock()
+        mock_api_instance.get.side_effect = [mock_not_ready, mock_ready]
+        mock_api_class = Mock(return_value=mock_api_instance)
+
+        with patch("sftk.biigle_handler.Api", mock_api_class):
+            with patch("time.sleep"):  # Don't actually sleep in tests
+                from sftk.biigle_handler import BiigleHandler
+
+                handler = BiigleHandler("test@example.com", "test_token")
+
+                zip_bytes = handler.download_report_zip_bytes(
+                    report_id=999, max_tries=5, poll_interval=0.1
+                )
+
+                assert mock_api_instance.get.call_count == 2
+                assert zip_bytes == b"fake zip content"
+
+
+class TestBiigleHandlerReadCsvsFromZipBytes:
+    """Test BiigleHandler read_csvs_from_zip_bytes method."""
+
+    def test_read_csvs_from_zip_bytes_simple(self):
+        """Test reading CSV files from a simple ZIP."""
+        # Create a ZIP with CSV files in memory
+        csv1_content = "col1,col2\n1,2\n3,4"
+        csv2_content = "col1,col2\n5,6\n7,8"
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr("file1.csv", csv1_content)
+            zf.writestr("file2.csv", csv2_content)
+        zip_bytes = zip_buffer.getvalue()
+
+        mock_api_instance = Mock()
+        mock_api_class = Mock(return_value=mock_api_instance)
+
+        with patch("sftk.biigle_handler.Api", mock_api_class):
+            from sftk.biigle_handler import BiigleHandler
+
+            handler = BiigleHandler("test@example.com", "test_token")
+
+            csv_dict = handler.read_csvs_from_zip_bytes(zip_bytes)
+
+            assert len(csv_dict) == 2
+            assert "file1.csv" in csv_dict
+            assert "file2.csv" in csv_dict
+            assert len(csv_dict["file1.csv"]) == 2
+            assert len(csv_dict["file2.csv"]) == 2
+
+    def test_read_csvs_from_zip_bytes_nested(self):
+        """Test reading CSV files from nested ZIPs."""
+        # Create nested ZIP: outer.zip contains inner.zip which contains file.csv
+        inner_csv = "col1,col2\n1,2"
+        inner_zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(inner_zip_buffer, "w") as zf:
+            zf.writestr("inner_file.csv", inner_csv)
+        inner_zip_bytes = inner_zip_buffer.getvalue()
+
+        outer_zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(outer_zip_buffer, "w") as zf:
+            zf.writestr("inner.zip", inner_zip_bytes)
+        outer_zip_bytes = outer_zip_buffer.getvalue()
+
+        mock_api_instance = Mock()
+        mock_api_class = Mock(return_value=mock_api_instance)
+
+        with patch("sftk.biigle_handler.Api", mock_api_class):
+            from sftk.biigle_handler import BiigleHandler
+
+            handler = BiigleHandler("test@example.com", "test_token")
+
+            csv_dict = handler.read_csvs_from_zip_bytes(
+                outer_zip_bytes, allow_nested=True
+            )
+
+            assert len(csv_dict) == 1
+            assert "inner_file.csv" in csv_dict
+            assert len(csv_dict["inner_file.csv"]) == 1
+
+
+class TestBiigleHandlerConcatCsvDict:
+    """Test BiigleHandler concat_csv_dict method."""
+
+    def test_concat_csv_dict_success(self):
+        """Test that concat_csv_dict concatenates DataFrames with source column."""
+        mock_api_instance = Mock()
+        mock_api_class = Mock(return_value=mock_api_instance)
+
+        with patch("sftk.biigle_handler.Api", mock_api_class):
+            from sftk.biigle_handler import BiigleHandler
+
+            handler = BiigleHandler("test@example.com", "test_token")
+
+            csv_dict = {
+                "file1.csv": pd.DataFrame({"col1": [1, 2], "col2": [3, 4]}),
+                "file2.csv": pd.DataFrame({"col1": [5, 6], "col2": [7, 8]}),
+            }
+
+            result = handler.concat_csv_dict(csv_dict, source_col="source_file")
+
+            assert len(result) == 4
+            assert "source_file" in result.columns
+            assert set(result["source_file"].unique()) == {"file1.csv", "file2.csv"}
+
+
+class TestBiigleHandlerExportReportToDf:
+    """Test BiigleHandler export_report_to_df method."""
+
+    def test_export_report_to_df_success(self):
+        """Test that export_report_to_df creates report, downloads, and returns DataFrame."""
+        # Mock report creation
         mock_report_response = Mock()
         mock_report_response.json.return_value = {"id": 999}
+        mock_report_response.raise_for_status = Mock()
+
+        # Mock ZIP download
+        csv_content = "col1,col2\n1,2\n3,4"
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr("annotations.csv", csv_content)
+        zip_bytes = zip_buffer.getvalue()
 
         mock_download_response = Mock()
-        mock_download_response.content = b"fake zip content"
+        mock_download_response.status_code = 200
+        mock_download_response.content = zip_bytes
 
         mock_api_instance = Mock()
         mock_api_instance.post.return_value = mock_report_response
         mock_api_instance.get.return_value = mock_download_response
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        # Create a simple mock DataFrame
-        mock_df = Mock()
-        mock_df.__len__ = Mock(return_value=5)  # Mock len() for logging
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
 
-            # Mock all the file operations after handler is created
-            with patch("builtins.open", mock_open()):
-                with patch("zipfile.ZipFile"):
-                    with patch("os.makedirs"):
-                        with patch("glob.glob", return_value=["test_annotations.csv"]):
-                            with patch("pandas.read_csv", return_value=mock_df):
+            result_df = handler.export_report_to_df(
+                resource="volumes", resource_id=12345, type_id=8
+            )
 
-                                volume_id = 12345
-                                type_id = 8
-                                extract_dir = "test_extract"
+            # Check report was created
+            mock_api_instance.post.assert_called_once_with(
+                "volumes/12345/reports", json={"type_id": 8}
+            )
 
-                                # Act
-                                result = handler.export_annotations(
-                                    volume_id, type_id, extract_dir
-                                )
+            # Check ZIP was downloaded
+            mock_api_instance.get.assert_called_once_with(
+                "reports/999", raise_for_status=False
+            )
 
-                                # Assert
-                                # Check report creation
-                                mock_api_instance.post.assert_called_once_with(
-                                    f"volumes/{volume_id}/reports",
-                                    json={"type_id": type_id},
-                                )
+            # Check result
+            assert isinstance(result_df, pd.DataFrame)
+            assert len(result_df) == 2
+            assert "source_file" in result_df.columns
 
-                                # Check report download
-                                mock_api_instance.get.assert_called_once_with(
-                                    "reports/999"
-                                )
 
-                                assert result == mock_df
+class TestBiigleHandlerBuildS3Url:
+    """Test BiigleHandler build_s3_url convenience method."""
 
-    def test_export_annotations_api_error(self):
-        """Test that export_annotations handles API errors gracefully."""
-        # Arrange
+    def test_build_s3_url(self):
+        """Test that build_s3_url creates correct BIIGLE S3 URL format."""
         mock_api_instance = Mock()
-        mock_api_instance.post.side_effect = Exception("API error")
         mock_api_class = Mock(return_value=mock_api_instance)
 
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
+        with patch("sftk.biigle_handler.Api", mock_api_class):
             from sftk.biigle_handler import BiigleHandler
 
             handler = BiigleHandler("test@example.com", "test_token")
 
-            # Act & Assert
-            with pytest.raises(Exception, match="API error"):
-                handler.export_annotations(12345, 8, "test_dir")
-
-
-class TestBiigleHandlerIntegration:
-    """Integration tests for BiigleHandler complete workflows."""
-
-    def test_complete_volume_workflow(self):
-        """Test the complete workflow from creating volume to exporting annotations."""
-        # Arrange
-        mock_projects_response = Mock()
-        mock_projects_response.json.return_value = [
-            {"id": 3711, "name": "Test Project"}
-        ]
-
-        mock_pending_volume_response = Mock()
-        mock_pending_volume_response.json.return_value = {"id": 12345}
-
-        mock_setup_response = Mock()
-        mock_setup_response.json.return_value = {"id": 12345, "name": "test_volume"}
-
-        mock_report_response = Mock()
-        mock_report_response.json.return_value = {"id": 999}
-
-        mock_download_response = Mock()
-        mock_download_response.content = b"fake zip content"
-
-        mock_api_instance = Mock()
-        mock_api_instance.get.side_effect = [
-            mock_projects_response,
-            mock_download_response,
-        ]
-        mock_api_instance.post.side_effect = [
-            mock_pending_volume_response,
-            mock_report_response,
-        ]
-        mock_api_instance.put.return_value = mock_setup_response
-        mock_api_class = Mock(return_value=mock_api_instance)
-
-        # Mock the biigle module
-        mock_biigle_module = MagicMock()
-        mock_biigle_module.Api = mock_api_class
-
-        mock_df = Mock()
-        mock_df.__len__ = Mock(return_value=10)
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
-
-            handler = BiigleHandler("test@example.com", "test_token")
-
-            # Mock file operations for export_annotations
-            with patch("builtins.open", mock_open()):
-                with patch("zipfile.ZipFile"):
-                    with patch("os.makedirs"):
-                        with patch("glob.glob", return_value=["annotations.csv"]):
-                            with patch("pandas.read_csv", return_value=mock_df):
-
-                                # Act - Complete workflow
-                                # 1. Get projects
-                                projects = handler.get_projects()
-
-                                # 2. Create pending volume
-                                pending_volume = handler.create_pending_volume(3711)
-
-                                # 3. Setup volume with files
-                                volume_info = handler.setup_volume_with_files(
-                                    12345,
-                                    "test_volume",
-                                    "s3://test",
-                                    ["file1.mp4", "file2.mp4"],
-                                )
-
-                                # 4. Export annotations
-                                annotations = handler.export_annotations(12345)
-
-                                # Assert
-                                assert len(projects) == 1
-                                assert pending_volume["id"] == 12345
-                                assert volume_info["name"] == "test_volume"
-                                assert annotations == mock_df
-
-                                # Verify all API calls were made
-                                assert (
-                                    mock_api_instance.get.call_count == 2
-                                )  # projects + download
-                                assert (
-                                    mock_api_instance.post.call_count == 2
-                                )  # pending volume + report
-                                assert (
-                                    mock_api_instance.put.call_count == 1
-                                )  # setup volume
-
-    def test_convenience_methods(self):
-        """Test convenience methods for common workflows."""
-        # Arrange
-        mock_biigle_module = MagicMock()
-        mock_api_class = Mock()
-        mock_biigle_module.Api = mock_api_class
-
-        with patch.dict("sys.modules", {"biigle": mock_biigle_module}):
-            from sftk.biigle_handler import BiigleHandler
-
-            handler = BiigleHandler("test@example.com", "test_token")
-
-            # Test build_s3_url
+            # Test without trailing slash (default disk_id is 134)
             s3_url = handler.build_s3_url("biigle_clips/test_folder")
-            assert s3_url == "disk-98://biigle_clips/test_folder/"
+            assert s3_url == "disk-134://biigle_clips/test_folder/"
 
+            # Test with trailing slash
             s3_url_with_slash = handler.build_s3_url("biigle_clips/test_folder/")
-            assert s3_url_with_slash == "disk-98://biigle_clips/test_folder/"
+            assert s3_url_with_slash == "disk-134://biigle_clips/test_folder/"
 
             # Test with custom disk_id
             s3_url_custom = handler.build_s3_url("biigle_clips/test", disk_id=99)

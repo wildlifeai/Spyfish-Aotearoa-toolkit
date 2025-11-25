@@ -336,8 +336,8 @@ class S3Handler:
         Uploads a string to S3.
 
         Args:
-            key (str): The S3 object key.
             text_data (str): The data to upload.
+            s3_path (str): The S3 object key.
 
         Returns:
             bool: True if upload succeeded, False otherwise.

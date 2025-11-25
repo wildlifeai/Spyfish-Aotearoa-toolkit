@@ -255,3 +255,90 @@ def test_normalize_file_name():
 
     # Test with empty string
     assert normalize_file_name("") == ""
+
+
+def test_str_to_bool():
+    """Test str_to_bool function with various inputs."""
+    from sftk.utils import str_to_bool
+
+    # Test with "true" (case-insensitive, must be exactly "true")
+    assert str_to_bool("true") is True
+    assert str_to_bool("True") is True
+    assert str_to_bool("TRUE") is True
+    assert str_to_bool(" true ") is True  # With whitespace
+
+    # Test with other values (should be False - only "true" returns True)
+    assert str_to_bool("false") is False
+    assert str_to_bool("False") is False
+    assert str_to_bool("yes") is False
+    assert str_to_bool("1") is False
+    assert str_to_bool("") is False
+
+    # Test with None
+    assert str_to_bool(None) is False
+
+
+def test_filter_file_paths_by_extension():
+    """Test filter_file_paths_by_extension function."""
+    from sftk.utils import filter_file_paths_by_extension
+
+    file_paths = [
+        "video1.mp4",
+        "video2.mov",
+        "image1.jpg",
+        "image2.png",
+        "document.pdf",
+        "video3.mp4",
+    ]
+
+    # Test filtering for video extensions
+    video_files = filter_file_paths_by_extension(file_paths, ["mp4", "mov"])
+    assert len(video_files) == 3
+    assert "video1.mp4" in video_files
+    assert "video2.mov" in video_files
+    assert "video3.mp4" in video_files
+
+    # Test filtering for image extensions
+    image_files = filter_file_paths_by_extension(file_paths, ["jpg", "png"])
+    assert len(image_files) == 2
+    assert "image1.jpg" in image_files
+    assert "image2.png" in image_files
+
+    # Test with empty list
+    empty_result = filter_file_paths_by_extension(file_paths, [])
+    assert len(empty_result) == 0
+
+    # Test case insensitivity
+    mixed_case = ["FILE.MP4", "file.mp4", "File.Mp4"]
+    result = filter_file_paths_by_extension(mixed_case, ["mp4"])
+    assert len(result) == 3
+
+
+def test_convert_int_num_columns_to_int():
+    """Test convert_int_num_columns_to_int function."""
+    from sftk.utils import convert_int_num_columns_to_int
+
+    # Create DataFrame with float columns that are whole numbers
+    df = pd.DataFrame(
+        {
+            "int_col": [1.0, 2.0, 3.0],
+            "float_col": [1.5, 2.5, 3.5],
+            "mixed_col": [1.0, 2.5, 3.0],
+            "string_col": ["a", "b", "c"],
+        }
+    )
+
+    result = convert_int_num_columns_to_int(df)
+
+    # int_col should be converted to Int64
+    assert result["int_col"].dtype == "Int64"
+    assert list(result["int_col"]) == [1, 2, 3]
+
+    # float_col should remain float (has decimals)
+    assert result["float_col"].dtype == "float64"
+
+    # mixed_col should remain float (has decimals)
+    assert result["mixed_col"].dtype == "float64"
+
+    # string_col should remain object
+    assert result["string_col"].dtype == "object"

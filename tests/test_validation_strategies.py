@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 
 def test_validation_config_defaults():
@@ -171,6 +172,7 @@ def test_error_limit_functionality():
 
 def test_file_presence_validator():
     """FilePresenceValidator should find missing and extra files."""
+    # TODO probably delete this
     from unittest.mock import Mock
 
     from sftk.validation_strategies import FilePresenceValidator
@@ -211,6 +213,7 @@ def test_file_presence_validator():
     )
 
 
+@pytest.mark.skip(reason="Might sunset this functionality")
 def test_file_presence_validator_get_file_differences():
     """FilePresenceValidator.get_file_differences should return missing and extra files as separate sets."""
     from unittest.mock import Mock

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
 
-from sftk.common import DROP_ID_COLUMN, REPLICATE_COLUMN
+from sftk.common import DROP_ID_COLUMN, REPLICATE_COLUMN, SURVEY_ID_COLUMN
 from sftk.utils import normalize_file_name
 
 
@@ -68,6 +68,8 @@ class CleanRowTracker:
 class ErrorChecking:
     """Data class for validation errors."""
 
+    survey_id: Optional[str]
+    drop_id: Optional[str]
     column_name: Optional[str]
     relevant_column_value: Optional[str]
     relevant_file: str
@@ -202,8 +204,10 @@ class ValidationStrategy(ABC):
 
     def create_error(
         self,
-        message: str,
-        error_source: str,
+        survey_id: Optional[str] = None,
+        drop_id: Optional[str] = None,
+        message: Optional[str] = None,
+        error_source: Optional[str] = None,
         file_name: Optional[str] = None,
         column_name: Optional[str] = None,
         relevant_column_value: Any = None,
@@ -215,11 +219,14 @@ class ValidationStrategy(ABC):
         It includes the same logic as DataValidator.create_error for compatibility.
 
         Args:
+            survey_id: SurveyID associated with the error (if available)
+            drop_id: DropID associated with the error (if available)
             message: Detailed error message describing the validation failure
             error_source: Source of the validation check
             file_name: Name or path of the file where the error occurred
             column_name: Name of the column that failed validation
             relevant_column_value: The actual value that caused the validation error
+
 
         Returns:
             ErrorChecking object with the provided details
@@ -227,6 +234,8 @@ class ValidationStrategy(ABC):
         file_name = normalize_file_name(file_name)
 
         return ErrorChecking(
+            survey_id=survey_id,
+            drop_id=drop_id,
             column_name=column_name,
             relevant_column_value=relevant_column_value,
             relevant_file=file_name,
@@ -344,7 +353,13 @@ class ValidationStrategy(ABC):
             col_name=col_name, relevant_column_info=relevant_column_info, **kwargs
         )
 
+        # Extract SurveyID and DropID from row if available
+        survey_id = row.get(SURVEY_ID_COLUMN, "")
+        drop_id = row.get(DROP_ID_COLUMN, "")
+
         error = self.create_error(
+            survey_id=survey_id,
+            drop_id=drop_id,
             message=message,
             error_source=error_source,
             column_name=col_name,
@@ -647,10 +662,16 @@ class RelationshipValidator(ValidationStrategy):
         if (actual in allowed_values) or (is_null_allowed and pd.isna(actual)):
             return None
 
+        # Extract SurveyID and DropID from row if available
+        survey_id = row.get(SURVEY_ID_COLUMN, "")
+        drop_id = row.get(DROP_ID_COLUMN, "")
+
         try:
             expected = template.format(**row)
         except KeyError as e:
             return self.create_error(
+                survey_id=survey_id,
+                drop_id=drop_id,
                 message=f"Missing column {col_name} for relationship template: {str(e)}",
                 error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
                 column_name=col_name,
@@ -668,6 +689,8 @@ class RelationshipValidator(ValidationStrategy):
                 message = f"{col_name} should be '{expected}', but is '{actual}'"
 
             return self.create_error(
+                survey_id=survey_id,
+                drop_id=drop_id,
                 message=message,
                 error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
                 column_name=col_name,
@@ -718,12 +741,38 @@ class FilePresenceValidator(ValidationStrategy):
         super().__init__(validation_rules, max_errors, clean_row_tracker)
         self.s3_handler = s3_handler
 
+    def _extract_survey_drop_from_path(
+        self, file_path: str
+    ) -> tuple[Optional[str], Optional[str]]:
+        """
+        Extract SurveyID and DropID from a file path.
+
+        File paths follow the pattern: media/{SurveyID}/{DropID}/{DropID}.mp4
+
+        Args:
+            file_path: File path to extract SurveyID and DropID from
+
+        Returns:
+            Tuple of (survey_id, drop_id), both may be None if extraction fails
+        """
+        try:
+            # Split path by '/' to get components
+            parts = file_path.split("/")
+            # Pattern: media/{SurveyID}/{DropID}/{DropID}.mp4
+            if len(parts) >= 3 and parts[0] == "media":
+                survey_id = parts[1] if parts[1] else None
+                drop_id = parts[2] if parts[2] else None
+                return survey_id, drop_id
+        except Exception:
+            pass
+        return None, None
+
     def validate(
         self,
         rules: Dict[str, Any],
         df: pd.DataFrame,
         dataset_name: Optional[str] = None,
-    ):  # pylint: disable=unused-argument
+    ):
         """
         Validate file presence between CSV references and S3 storage.
 
@@ -737,11 +786,9 @@ class FilePresenceValidator(ValidationStrategy):
             df: DataFrame to validate (not used directly, but kept for interface consistency)
 
         Returns:
-            Tuple of (errors, missing_files, extra_files) where:
-            - errors: List of ErrorChecking objects for missing and extra files
-            - missing_files: Set of files listed in CSV but missing from S3
-            - extra_files: Set of files in S3 not listed in the CSV
+            List of ErrorChecking objects for missing and extra files
         """
+        # TODO might delete this? as it's not part of the Errors and just keep the extra files export
         errors: list[ErrorChecking] = []
 
         # Get file presence configuration from rules
@@ -758,8 +805,11 @@ class FilePresenceValidator(ValidationStrategy):
             for file_path in missing_files:
                 if not self._should_continue_collecting_errors(len(errors)):
                     break
+                survey_id, drop_id = self._extract_survey_drop_from_path(file_path)
                 errors.append(
                     self.create_error(
+                        survey_id=survey_id,
+                        drop_id=drop_id,
                         message=f"File {file_path} not found in AWS, but found in {csv_filename}",
                         relevant_column_value=file_path,
                         error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
@@ -770,11 +820,13 @@ class FilePresenceValidator(ValidationStrategy):
             for file_path in extra_files:
                 if not self._should_continue_collecting_errors(len(errors)):
                     break
+                survey_id, drop_id = self._extract_survey_drop_from_path(file_path)
                 errors.append(
                     self.create_error(
+                        survey_id=survey_id,
+                        drop_id=drop_id,
                         message=f"File {file_path} found in AWS but not in {csv_filename}",
                         relevant_column_value=file_path,
-                        error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
                     )
                 )
 

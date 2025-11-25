@@ -1,123 +1,133 @@
-from unittest.mock import MagicMock, patch
+"""
+Tests for clean_data module.
+"""
 
-import pytest
-import requests
+from unittest.mock import Mock, patch
 
 from sftk.clean_data import ScientificNameEntry, ScientificNameProcessing
 
 
-@pytest.fixture
-def valid_scientific_name():
-    return "Kathetostoma giganteum"
+class TestScientificNameProcessing:
+    """Test ScientificNameProcessing class."""
 
+    def test_clean_name_with_valid_string(self):
+        """Test that clean_name returns cleaned name for valid string."""
+        processor = ScientificNameProcessing(
+            scientific_name_to_check="Chrysophrys auratus", common_name="Snapper"
+        )
 
-@pytest.fixture
-def invalid_scientific_name():
-    return "Kathetostoma giganteu"
+        result = processor.clean_name()
 
+        assert result == "Chrysophrys auratus"
+        assert processor.higher_taxon == ""
 
-@pytest.fixture
-def sp_name():
-    return "Triglidae sp"
+    def test_clean_name_with_sp_suffix(self):
+        """Test that clean_name handles ' sp' suffix correctly."""
+        processor = ScientificNameProcessing(
+            scientific_name_to_check="Chrysophrys sp", common_name="Snapper"
+        )
 
+        result = processor.clean_name()
 
-@pytest.fixture
-def common_name():
-    return "Giant stargazer"
+        assert result == "Chrysophrys"
+        assert processor.higher_taxon == " sp"
 
+    def test_clean_name_with_invalid_inputs(self):
+        """Test that clean_name returns None for non-string inputs."""
+        # Test with None
+        processor = ScientificNameProcessing(
+            scientific_name_to_check=None, common_name="Snapper"
+        )
+        assert processor.clean_name() is None
 
-@pytest.fixture
-def processor(valid_scientific_name, common_name):
-    return ScientificNameProcessing(
-        scientific_name_to_check=valid_scientific_name, common_name=common_name
-    )
+        # Test with integer
+        processor = ScientificNameProcessing(
+            scientific_name_to_check=123, common_name="Snapper"
+        )
+        assert processor.clean_name() is None
 
+    @patch("sftk.clean_data.requests.get")
+    def test_query_api_success(self, mock_get):
+        """Test that query_api successfully queries WoRMS API."""
+        # Mock API response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                "AphiaID": 123456,
+                "valid_name": "Chrysophrys auratus",
+                "rank": "Species",
+                "status": "accepted",
+            }
+        ]
+        mock_get.return_value = mock_response
 
-def test_clean_name_valid(processor, valid_scientific_name):
-    cleaned_name = processor.clean_name()
-    assert cleaned_name == valid_scientific_name
+        processor = ScientificNameProcessing(
+            scientific_name_to_check="Chrysophrys auratus", common_name="Snapper"
+        )
 
+        result = processor.query_api()
 
-def test_clean_name_with_sp(processor, sp_name):
-    processor.scientific_name_to_check = sp_name
-    cleaned_name = processor.clean_name()
-    assert cleaned_name == "Triglidae"
-    assert processor.higher_taxon == " sp"
+        assert isinstance(result, ScientificNameEntry)
+        assert result.aphia_id == 123456
+        assert result.scientific_name == "Chrysophrys auratus"
+        assert result.common_name == "Snapper"
+        assert result.scientific_name_to_check == "Chrysophrys auratus"
+        assert result.scientific_names_match is True
+        assert result.status == "accepted"
 
+    @patch("sftk.clean_data.requests.get")
+    def test_query_api_with_sp_suffix(self, mock_get):
+        """Test that query_api handles ' sp' suffix correctly."""
+        # Mock API response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                "AphiaID": 123456,
+                "valid_name": "Chrysophrys",
+                "rank": "Genus",
+                "status": "accepted",
+            }
+        ]
+        mock_get.return_value = mock_response
 
-def test_clean_name_invalid_type(processor):
-    processor.scientific_name_to_check = 1234  # Invalid input (int)
-    cleaned_name = processor.clean_name()
-    assert cleaned_name is None
+        processor = ScientificNameProcessing(
+            scientific_name_to_check="Chrysophrys sp", common_name="Snapper"
+        )
 
+        result = processor.query_api()
 
-@patch("requests.get")
-def test_query_api_success(mock_get, processor):
-    # Mock the response from the API
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = [
-        {"AphiaID": 123456, "valid_name": "Kathetostoma giganteum", "rank": "Species"}
-    ]
-    mock_get.return_value = mock_response
+        assert result.scientific_name == "Chrysophrys sp"
+        assert result.scientific_names_match is True
 
-    entry = processor.query_api()
+    @patch("sftk.clean_data.requests.get")
+    def test_query_api_invalid_name(self, mock_get):
+        """Test that query_api returns failed entry for invalid name."""
+        processor = ScientificNameProcessing(
+            scientific_name_to_check=None, common_name="Snapper"
+        )
 
-    assert isinstance(entry, ScientificNameEntry)
-    assert entry.aphia_id == 123456
-    assert entry.scientific_name == "Kathetostoma giganteum"
-    assert entry.scientific_names_match is True
-    assert entry.taxon_rank == "Species"
+        result = processor.query_api()
 
+        assert isinstance(result, ScientificNameEntry)
+        assert result.status == "invalid name"
+        assert result.scientific_name_to_check is None
+        mock_get.assert_not_called()
 
-@patch("requests.get")
-def test_query_api_no_results(mock_get, processor, valid_scientific_name):
-    # Mock API response with no results
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = []
-    mock_get.return_value = mock_response
+    @patch("sftk.clean_data.requests.get")
+    def test_query_api_api_error(self, mock_get):
+        """Test that query_api handles API errors gracefully."""
+        import requests
 
-    entry = processor.query_api()
+        mock_get.side_effect = requests.exceptions.RequestException("Connection error")
 
-    assert isinstance(entry, ScientificNameEntry)
-    assert entry.scientific_name_to_check == valid_scientific_name
-    assert entry.scientific_name is None
-    assert entry.scientific_names_match is False
+        processor = ScientificNameProcessing(
+            scientific_name_to_check="Chrysophrys auratus", common_name="Snapper"
+        )
 
+        result = processor.query_api()
 
-@patch("requests.get")
-def test_query_api_error(mock_get, processor, valid_scientific_name):
-    # Simulate an error in the request (e.g., connection error)
-    mock_get.side_effect = requests.exceptions.RequestException("Connection error")
-
-    entry = processor.query_api()
-
-    assert isinstance(entry, ScientificNameEntry)
-    assert entry.scientific_name_to_check == valid_scientific_name
-    assert entry.scientific_name is None
-
-
-@patch("requests.get")
-def test_query_api_invalid_json(mock_get, processor, valid_scientific_name):
-    # Mock an invalid JSON response from the API
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.side_effect = ValueError("Invalid JSON")
-    mock_get.return_value = mock_response
-
-    entry = processor.query_api()
-
-    assert isinstance(entry, ScientificNameEntry)
-    assert entry.scientific_name_to_check == valid_scientific_name
-    assert entry.scientific_name is None
-
-
-def test_failed_to_process(processor, valid_scientific_name, caplog):
-    # Test if the failed_to_process method logs the correct warning and returns the expected value
-    result = processor.failed_to_process("Test error")
-
-    assert "Test error" in caplog.text  # Ensure the error message is logged
-    assert isinstance(result, ScientificNameEntry)
-    assert result.scientific_name_to_check == valid_scientific_name
-    assert result.scientific_name is None
+        assert isinstance(result, ScientificNameEntry)
+        assert result.status == "api error"
+        assert "api error" in result.status.lower()

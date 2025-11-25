@@ -146,8 +146,9 @@ VALIDATION_RULES = {
             DROP_ID_COLUMN,
             SURVEY_ID_COLUMN,
             SITE_ID_COLUMN,
-            "FileName",
-            "LinkToVideoFile",
+            # TODO remove? Should be covered by file presence check
+            # FILE_NAME_COLUMN,
+            # "LinkToVideoFile",
         ],
         "unique": [DROP_ID_COLUMN],
         "info_columns": [SURVEY_ID_COLUMN, SITE_ID_COLUMN],
@@ -191,7 +192,7 @@ VALIDATION_RULES = {
     "sites": {
         "file_name": S3_SHAREPOINT_SITE_CSV,
         "required": [SITE_ID_COLUMN],
-        "unique": [SITE_ID_COLUMN],
+        "unique": [SITE_ID_COLUMN, "LinkToMarineReserve"],
         "info_columns": ["SiteName", "LinkToMarineReserve"],
         "foreign_keys": {},
         "relationships": [],
@@ -202,7 +203,8 @@ VALIDATION_RULES = {
         "unique": [
             "AphiaID",
             "ScientificName",
-        ],  # No need for "CommonName" to be unique
+            "CommonName",
+        ],
         "info_columns": ["AphiaID", "CommonName", "ScientificName"],
         "foreign_keys": {},
         "relationships": [],

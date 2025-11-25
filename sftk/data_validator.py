@@ -116,7 +116,7 @@ class DataValidator:
         if config.extract_clean_dataframes:
             self.export_clean_dataframes_to_csv()
             summary = self.get_clean_summary()
-            logging.info("Data info", summary)
+            logging.info(f"Data info: {summary}")
 
         if config.file_presence:
             self.export_file_differences()
@@ -189,7 +189,9 @@ class DataValidator:
             # Handle file presence validation separately (no DataFrame needed)
             if dataset_name == "file_presence":
                 if config.file_presence:
-                    self._validate_file_presence(rules, strategy_registry)
+                    pass
+                    # TODO will probably remove this part, as it's not part of the errors anymore
+                    # self._validate_file_presence(rules, strategy_registry)
                 continue
 
             file_name = normalize_file_name(rules.get("file_name", ""))
@@ -342,8 +344,10 @@ class DataValidator:
 
     def create_error(
         self,
-        message: str,
-        error_source: str,
+        survey_id: str = "",
+        drop_id: str = "",
+        message: str = "",
+        error_source: str = "",
         file_name: str = "",
         column_name: str = "",
         relevant_column_value: Any = None,
@@ -360,6 +364,8 @@ class DataValidator:
             file_name: Name or path of the file where the error occurred
             column_name: Name of the column that failed validation
             relevant_column_value: The actual value that caused the validation error
+            survey_id: SurveyID associated with the error (if available)
+            drop_id: DropID associated with the error (if available)
 
         Returns:
             ErrorChecking object with the provided details
@@ -367,6 +373,8 @@ class DataValidator:
         file_name = normalize_file_name(file_name)
 
         return ErrorChecking(
+            survey_id=survey_id,
+            drop_id=drop_id,
             column_name=column_name,
             relevant_column_value=relevant_column_value,
             relevant_file=file_name,
@@ -444,7 +452,6 @@ class DataValidator:
             The CSV is exported without the DataFrame index to keep the
             output clean and focused on the error data.
         """
-        # TODO S3 handling
 
         if EXPORT_LOCAL:
             path = os.path.join(self.FOLDER_PATH, csv_file_name)
