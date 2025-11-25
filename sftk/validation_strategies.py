@@ -827,6 +827,7 @@ class FilePresenceValidator(ValidationStrategy):
                         drop_id=drop_id,
                         message=f"File {file_path} found in AWS but not in {csv_filename}",
                         relevant_column_value=file_path,
+                        error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
                     )
                 )
 

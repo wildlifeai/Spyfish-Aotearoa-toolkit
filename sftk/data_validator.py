@@ -493,7 +493,6 @@ class DataValidator:
             - CSV files are exported without DataFrame index
             - Empty dataframes are skipped
         """
-        # TODO add s3 handling
         if not self.clean_row_tracker:
             raise ValueError(
                 "Clean dataframes not available. Enable extract_clean_dataframes "
