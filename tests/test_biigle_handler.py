@@ -340,13 +340,16 @@ def test_build_s3_url():
 
         # Test default disk_id and trailing slash handling
         assert (
-            handler.build_s3_url("biigle_clips/test_folder") == "disk-134://biigle_clips/test_folder/"
+            handler.build_s3_url("biigle_clips/test_folder")
+            == "disk-134://biigle_clips/test_folder/"
         )
         assert (
-            handler.build_s3_url("biigle_clips/test_folder/") == "disk-134://biigle_clips/test_folder/"
+            handler.build_s3_url("biigle_clips/test_folder/")
+            == "disk-134://biigle_clips/test_folder/"
         )
 
         # Test custom disk_id
         assert (
-            handler.build_s3_url("biigle_clips/test", disk_id=99) == "disk-99://biigle_clips/test/"
+            handler.build_s3_url("biigle_clips/test", disk_id=99)
+            == "disk-99://biigle_clips/test/"
         )
