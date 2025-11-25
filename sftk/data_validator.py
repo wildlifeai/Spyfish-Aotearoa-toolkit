@@ -75,8 +75,6 @@ class DataValidator:
             self.validation_rules, self.patterns, self.s3_handler
         )
         if EXPORT_LOCAL:
-            path = Path(LOCAL_DATA_FOLDER_PATH)
-            path.parent.mkdir(parents=True, exist_ok=True)
             self.FOLDER_PATH = LOCAL_DATA_FOLDER_PATH
         else:
             self.FOLDER_PATH = S3_SPYFISH_METADATA
@@ -454,7 +452,9 @@ class DataValidator:
         """
 
         if EXPORT_LOCAL:
-            path = os.path.join(self.FOLDER_PATH, csv_file_name)
+            path = Path(self.FOLDER_PATH) / csv_file_name
+            path.parent.mkdir(parents=True, exist_ok=True)
+
             self.errors_df.to_csv(path, index=False)
             logging.info(f"Errors exported locally to csv file {path}.")
         else:
@@ -513,6 +513,8 @@ class DataValidator:
 
             if EXPORT_LOCAL:
                 output_path = os.path.join(self.FOLDER_PATH, current_filename)
+                path = Path(output_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
                 clean_df.to_csv(output_path, index=False)
                 logging.info(
                     f"Clean {dataset_name} dataframe exported to {output_path}"

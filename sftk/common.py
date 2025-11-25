@@ -113,6 +113,8 @@ SURVEY_ID_COLUMN = "SurveyID"
 SITE_ID_COLUMN = "SiteID"
 REPLICATE_COLUMN = "ReplicateWithinSite"
 FILE_NAME_COLUMN = "FileName"
+LINK_TO_MARINE_RESERVE_COLUMN = "LinkToMarineReserve"
+SITE_NAME_COLUMN = "SiteName"
 
 
 # Keywords to monitor in email
@@ -192,8 +194,8 @@ VALIDATION_RULES = {
     "sites": {
         "file_name": S3_SHAREPOINT_SITE_CSV,
         "required": [SITE_ID_COLUMN],
-        "unique": [SITE_ID_COLUMN, "LinkToMarineReserve"],
-        "info_columns": ["SiteName", "LinkToMarineReserve"],
+        "unique": [SITE_ID_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "info_columns": [SITE_NAME_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
         "foreign_keys": {},
         "relationships": [],
     },
