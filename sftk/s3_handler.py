@@ -103,7 +103,7 @@ class ProgressTracker:
 
             logging.info(
                 f"   📥 {self.filename}: {percent:.1f}% "
-                f"({self.transferred / (1024*1024):.1f}/{self.total_size / (1024*1024):.1f} MB) "
+                f"({self.transferred / (1024 * 1024):.1f}/{self.total_size / (1024 * 1024):.1f} MB) "
                 f"@ {speed_mbps:.2f} MB/s - ETA: {eta_formatted}"
             )
 
@@ -112,7 +112,7 @@ class ProgressTracker:
         elapsed = time.time() - self.start_time
         speed_mbps = (self.total_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
         logging.info(
-            f"   ✅ {self.filename}: {self.total_size / (1024*1024):.1f} MB "
+            f"   ✅ {self.filename}: {self.total_size / (1024 * 1024):.1f} MB "
             f"in {elapsed:.1f}s (avg {speed_mbps:.2f} MB/s)"
         )
 
@@ -327,6 +327,30 @@ class S3Handler:
                 f"Failed to download or read S3 file {key}: {e}"
             ) from e
 
+    def upload_data_to_s3(
+        self,
+        text_data: str,
+        s3_path: str,
+    ) -> bool:
+        """
+        Uploads a string to S3.
+
+        Args:
+            text_data (str): The data to upload.
+            s3_path (str): The S3 object key.
+
+        Returns:
+            bool: True if upload succeeded, False otherwise.
+        """
+        logging.info("Uploading data to S3 %s", s3_path)
+        try:
+            self.s3.put_object(Bucket=self.bucket, Key=s3_path, Body=text_data)
+            logging.info("Successfully uploaded data to S3 %s", s3_path)
+            return True
+        except BotoCoreError as e:
+            logging.error("Failed to upload data to S3 %s, with error: %s", s3_path, e)
+            return False
+
     def upload_file_to_s3(
         self,
         filename: str,
@@ -361,7 +385,7 @@ class S3Handler:
         else:
             ct, _ = mimetypes.guess_type(filename)
             content_args = {"ContentType": ct or "application/octet-stream"}
-
+        logging.info("Uploading file %s to S3", filename)
         try:
             file_size = os.path.getsize(filename)
             if callback:
@@ -393,7 +417,12 @@ class S3Handler:
                 delete_file(filename)
 
     def upload_updated_df_to_s3(
-        self, df: pd.DataFrame, key: str, keyword: str, keep_df_index=True
+        self,
+        df: pd.DataFrame,
+        key: str,
+        filename: Optional[str] = None,
+        keyword: Optional[str] = None,
+        keep_df_index=True,
     ) -> None:
         """
         Upload an updated DataFrame to S3 with progress bar and error handling.
@@ -404,10 +433,16 @@ class S3Handler:
             keyword (str): String identifier for the type of data (e.g., "survey", "site").
             keep_df_index (bool): Whether to write the DataFrame index to the CSV.
         """
-        temp_filename = f"updated_{keyword}_kso_temp.csv"
+        if keyword:
+            temp_filename = f"updated_{keyword}_kso_temp.csv"
+        elif filename:
+            temp_filename = filename
+        else:
+            raise ValueError("Either keyword or filename must be provided.")
+
         try:
             df.to_csv(temp_filename, index=keep_df_index)
-            self.upload_file_to_s3(temp_filename, key, delete_file_after_upload=True)
+            self.upload_file_to_s3(temp_filename, key)
         except (BotoCoreError, IOError) as e:
             logging.error("Failed to upload updated %s data to S3: %s", keyword, e)
         finally:

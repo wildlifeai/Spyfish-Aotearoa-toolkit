@@ -6,85 +6,18 @@ from the sftk module. It validates data according to configured rules and
 exports the results either locally or to S3.
 """
 
-import logging
-import os
-
-# Import centralized logging configuration
-from sftk import log_config  # noqa: F401
-from sftk.common import EXPORT_LOCAL, LOCAL_DATA_FOLDER_PATH
 from sftk.data_validator import DataValidator
-from sftk.validation_strategies import ValidationConfig
-
-
-def main(
-    enable_all: bool = False,
-    required: bool = False,
-    unique: bool = False,
-    foreign_keys: bool = False,
-    formats: bool = False,
-    column_relationships: bool = False,
-    file_presence: bool = False,
-    remove_duplicates: bool = True,
-    extract_clean_dataframes: bool = False,
-):
-    """Main function to run data validation."""
-    logging.info("Error validation started")
-
-    # Create validator and configuration
-    validator = DataValidator()
-    config = ValidationConfig()
-    config.remove_duplicates = remove_duplicates
-    config.extract_clean_dataframes = extract_clean_dataframes
-    if enable_all:
-        config.enable_all_validators()  # Enable all validation types
-    else:
-        config.required = required
-        config.unique = unique
-        config.foreign_keys = foreign_keys
-        config.formats = formats
-        config.column_relationships = column_relationships
-        config.file_presence = file_presence
-
-    # Run validation using new interface
-    result_df = validator.validate_with_config(config)
-    logging.info(f"Error validation completed, {result_df.shape[0]} errors found")
-
-    # Export results
-    if EXPORT_LOCAL:
-
-        validator.export_to_csv(
-            os.path.join(LOCAL_DATA_FOLDER_PATH, "validation_errors.csv")
-        )
-        if config.extract_clean_dataframes:
-            # Export clean dataframes using the new method
-            validator.export_clean_dataframes_to_csv(LOCAL_DATA_FOLDER_PATH)
-
-            summary = validator.get_clean_summary()
-            logging.info(summary)
-
-        # Export file differences to separate text files
-        missing_files_path = os.path.join(
-            LOCAL_DATA_FOLDER_PATH, "missing_files_in_aws.txt"
-        )
-        extra_files_path = os.path.join(
-            LOCAL_DATA_FOLDER_PATH, "extra_files_in_aws.txt"
-        )
-        validator.export_file_differences(missing_files_path, extra_files_path)
-
-    else:
-        validator.upload_to_s3()
-    logging.info("Error validation process completed, files created/uploaded.")
-
 
 if __name__ == "__main__":
-    main(
+    dv = DataValidator()
+    dv.run_validation(
         enable_all=True,
         remove_duplicates=True,
         extract_clean_dataframes=True,
+        file_presence=True,
         # required = True,
         # unique = True,
         # foreign_keys = True,
         # formats = True,
         # column_relationships = True,
-        # file_presence = True,
     )
