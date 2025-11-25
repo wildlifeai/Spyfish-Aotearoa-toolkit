@@ -8,13 +8,16 @@ data validation using various validation strategies.
 import copy
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
 
 from sftk.common import (
+    EXPORT_LOCAL,
     FILE_PRESENCE_RULES,
-    S3_KSO_ERRORS_CSV,
+    LOCAL_DATA_FOLDER_PATH,
+    S3_SPYFISH_METADATA,
     VALIDATION_PATTERNS,
     VALIDATION_RULES,
 )
@@ -22,7 +25,7 @@ from sftk.s3_handler import S3FileNotFoundError, S3Handler
 from sftk.utils import (
     convert_int_num_columns_to_int,
     normalize_file_name,
-    write_files_to_txt,
+    write_data_to_file,
 )
 from sftk.validation_strategies import (
     CleanRowTracker,
@@ -71,6 +74,54 @@ class DataValidator:
         self.strategy_registry = ValidationStrategyRegistry(
             self.validation_rules, self.patterns, self.s3_handler
         )
+        if EXPORT_LOCAL:
+            path = Path(LOCAL_DATA_FOLDER_PATH)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.FOLDER_PATH = LOCAL_DATA_FOLDER_PATH
+        else:
+            self.FOLDER_PATH = S3_SPYFISH_METADATA
+
+    def run_validation(
+        self,
+        enable_all: bool = False,
+        required: bool = False,
+        unique: bool = False,
+        foreign_keys: bool = False,
+        formats: bool = False,
+        column_relationships: bool = False,
+        file_presence: bool = False,
+        remove_duplicates: bool = True,
+        extract_clean_dataframes: bool = False,
+    ):
+        """Main function to run data validation."""
+        logging.info("Error validation started")
+        config = ValidationConfig()
+
+        config.remove_duplicates = remove_duplicates
+        config.extract_clean_dataframes = extract_clean_dataframes
+        if enable_all:
+            config.enable_all_validators()  # Enable all validation types
+        else:
+            config.required = required
+            config.unique = unique
+            config.foreign_keys = foreign_keys
+            config.formats = formats
+            config.column_relationships = column_relationships
+            config.file_presence = file_presence
+
+        # Run validation using new interface
+        result_df = self.validate_with_config(config)
+        logging.info(f"Error validation completed, {result_df.shape[0]} errors found")
+        self.export_to_csv()
+        if config.extract_clean_dataframes:
+            self.export_clean_dataframes_to_csv()
+            summary = self.get_clean_summary()
+            logging.info("Data info", summary)
+
+        if config.file_presence:
+            self.export_file_differences()
+
+        logging.info("Error validation process completed, files created/uploaded.")
 
     def _get_validation_rules(self) -> Dict[str, Any]:
         """
@@ -293,8 +344,8 @@ class DataValidator:
         self,
         message: str,
         error_source: str,
-        file_name: str = None,
-        column_name: str = None,
+        file_name: str = "",
+        column_name: str = "",
         relevant_column_value: Any = None,
     ) -> ErrorChecking:
         """
@@ -376,7 +427,7 @@ class DataValidator:
 
     def export_to_csv(self, csv_file_name="validation_errors_cleaned.csv"):
         """
-        Export validation errors to a CSV file.
+        Export validation errors to a CSV file or S3 bucket.
 
         Saves the errors DataFrame to a CSV file for analysis and reporting.
         The CSV will contain all validation errors with their associated metadata.
@@ -393,10 +444,24 @@ class DataValidator:
             The CSV is exported without the DataFrame index to keep the
             output clean and focused on the error data.
         """
-        self.errors_df.to_csv(csv_file_name, index=False)
-        logging.info(f"Errors exported to csv file {csv_file_name}.")
+        # TODO S3 handling
 
-    def export_clean_dataframes_to_csv(self, output_directory: str) -> None:
+        if EXPORT_LOCAL:
+            path = os.path.join(self.FOLDER_PATH, csv_file_name)
+            self.errors_df.to_csv(path, index=False)
+            logging.info(f"Errors exported locally to csv file {path}.")
+        else:
+            self.s3_handler.upload_updated_df_to_s3(
+                df=self.errors_df,
+                key=self.FOLDER_PATH,
+                filename=csv_file_name,
+                keep_df_index=False,
+            )
+            logging.info(
+                f"Errors exported to S3 csv file {self.FOLDER_PATH}/{csv_file_name}."
+            )
+
+    def export_clean_dataframes_to_csv(self) -> None:
         """
         Export all clean dataframes to CSV files.
 
@@ -421,6 +486,7 @@ class DataValidator:
             - CSV files are exported without DataFrame index
             - Empty dataframes are skipped
         """
+        # TODO add s3 handling
         if not self.clean_row_tracker:
             raise ValueError(
                 "Clean dataframes not available. Enable extract_clean_dataframes "
@@ -432,51 +498,35 @@ class DataValidator:
             logging.info("No clean dataframes to export.")
             return
 
-        if not os.path.exists(output_directory):
-            raise OSError(f"Output directory does not exist: {output_directory}")
-
         for dataset_name, clean_df in clean_dataframes.items():
             if clean_df.empty:
                 logging.info(f"Skipping empty clean dataframe for {dataset_name}")
                 continue
 
-            output_path = os.path.join(output_directory, f"clean_{dataset_name}.csv")
-            clean_df.to_csv(output_path, index=False)
-            logging.info(f"Clean {dataset_name} dataframe exported to {output_path}")
+            current_filename = f"clean_{dataset_name}.csv"
+
+            if EXPORT_LOCAL:
+                output_path = os.path.join(self.FOLDER_PATH, current_filename)
+                clean_df.to_csv(output_path, index=False)
+                logging.info(
+                    f"Clean {dataset_name} dataframe exported to {output_path}"
+                )
+            else:
+                self.s3_handler.upload_updated_df_to_s3(
+                    df=clean_df,
+                    key=self.FOLDER_PATH,
+                    filename=current_filename,
+                    keep_df_index=False,
+                )
 
         logging.info(
-            f"Exported {len(clean_dataframes)} clean dataframes to {output_directory}"
+            f"Exported {len(clean_dataframes)} clean dataframes to {self.FOLDER_PATH}"
         )
-
-    def upload_to_s3(self):
-        """
-        Upload validation errors DataFrame to S3 storage.
-
-        Uploads the errors DataFrame to the configured S3 bucket and key location
-        for centralized storage and access. Uses the S3Handler to manage the upload.
-
-        Side Effects:
-            - Uploads errors_df to S3 at the location specified by S3_KSO_ERRORS_CSV
-            - Logs the upload operation
-
-        Note:
-            - Uses "errors" as the keyword for the upload operation
-            - Uploads without the DataFrame index to keep the data clean
-            - Relies S3_KSO_ERRORS_CSV configuration constants
-        """
-        keyword = "errors"
-        self.s3_handler.upload_updated_df_to_s3(
-            df=self.errors_df,
-            key=S3_KSO_ERRORS_CSV,
-            keyword=keyword,
-            keep_df_index=False,
-        )
-        logging.info(f"Updated {keyword} DataFrame uploaded to S3")
 
     def export_file_differences(
         self,
-        missing_files_path: str,
-        extra_files_path: str,
+        missing_file_name: str = "missing_files_in_aws.txt",
+        extra_file_name: str = "extra_files_in_aws.txt",
         file_presence_rules: Dict[str, Any] = FILE_PRESENCE_RULES,
     ) -> None:
         """
@@ -508,16 +558,28 @@ class DataValidator:
                 return
 
             # Get file differences using the existing validator
-            missing_files, extra_files = file_presence_validator.get_file_differences(
-                file_presence_rules
+            missing_files_set, extra_files_set = (
+                file_presence_validator.get_file_differences(file_presence_rules)
             )
+            missing_files_data = "\n".join(sorted(missing_files_set))
+            extra_files_data = "\n".join(sorted(extra_files_set))
 
-            # Write to text files
-            write_files_to_txt(missing_files, missing_files_path)
-            write_files_to_txt(extra_files, extra_files_path)
+            # Export file differences to separate text files
+            missing_files_path = os.path.join(self.FOLDER_PATH, missing_file_name)
+            extra_files_path = os.path.join(self.FOLDER_PATH, extra_file_name)
+
+            if EXPORT_LOCAL:
+                write_data_to_file(missing_files_data, missing_files_path)
+                write_data_to_file(extra_files_data, extra_files_path)
+
+            else:
+                self.s3_handler.upload_data_to_s3(
+                    missing_files_data, missing_files_path
+                )
+                self.s3_handler.upload_data_to_s3(extra_files_data, extra_files_path)
 
             logging.info(
-                f"File differences exported: {len(missing_files)} missing, {len(extra_files)} extra"
+                f"File differences exported: {len(missing_files_set)} missing, {len(extra_files_set)} extra"
             )
 
         except Exception as e:
@@ -586,7 +648,7 @@ class DataValidator:
                 "datasets": {},
             }
 
-        summary = {"datasets": {}}
+        summary: Dict[str, Any] = {"datasets": {}}
 
         for dataset_name in self.clean_row_tracker.clean_row_indices.keys():
             dataset_rules = self.validation_rules.get(dataset_name)

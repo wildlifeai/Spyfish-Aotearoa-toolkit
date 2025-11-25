@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
 
-from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+from sftk.common import DROP_ID_COLUMN, REPLICATE_COLUMN
 from sftk.utils import normalize_file_name
 
 
@@ -660,7 +660,7 @@ class RelationshipValidator(ValidationStrategy):
 
         if rule == "equals" and str(actual) != str(expected):
             # Check for specific DropID replicate mismatch case
-            if col_name == DROPID_COLUMN and self._is_replicate_mismatch_only(
+            if col_name == DROP_ID_COLUMN and self._is_replicate_mismatch_only(
                 str(actual), str(expected)
             ):
                 message = f"{REPLICATE_COLUMN} mismatch: {col_name} should end with '{str(expected)[-2:]}' but ends with '{str(actual)[-2:]}'. Full {col_name} should be '{expected}', but is '{actual}'"
@@ -723,7 +723,7 @@ class FilePresenceValidator(ValidationStrategy):
         rules: Dict[str, Any],
         df: pd.DataFrame,
         dataset_name: Optional[str] = None,
-    ) -> List[ErrorChecking]:  # pylint: disable=unused-argument
+    ):  # pylint: disable=unused-argument
         """
         Validate file presence between CSV references and S3 storage.
 
@@ -737,7 +737,10 @@ class FilePresenceValidator(ValidationStrategy):
             df: DataFrame to validate (not used directly, but kept for interface consistency)
 
         Returns:
-            List of ErrorChecking objects for missing and extra files
+            Tuple of (errors, missing_files, extra_files) where:
+            - errors: List of ErrorChecking objects for missing and extra files
+            - missing_files: Set of files listed in CSV but missing from S3
+            - extra_files: Set of files in S3 not listed in the CSV
         """
         errors: list[ErrorChecking] = []
 

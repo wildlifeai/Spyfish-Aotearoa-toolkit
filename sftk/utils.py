@@ -203,12 +203,12 @@ def convert_int_num_columns_to_int(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def write_files_to_txt(file_set: set[str], output_path: str) -> None:
+def write_data_to_file(data_str: str, output_path: str) -> None:
     """
-    Write a set of file paths to a text file, one path per line.
+    Write data to a text file.
 
     Args:
-        file_set: Set of file paths to write
+        data_str: Data to write to the file
         output_path: Path to the output text file
 
     Side Effects:
@@ -217,9 +217,8 @@ def write_files_to_txt(file_set: set[str], output_path: str) -> None:
     """
     try:
         with open(output_path, "w", encoding="utf-8") as f:
-            for file_path in sorted(file_set):
-                f.write(f"{file_path}\n")
-        logging.info(f"Wrote {len(file_set)} file paths to {output_path}")
+            f.write(data_str)
+        logging.info(f"Wrote data to {output_path}")
     except (IOError, OSError) as e:
         logging.error(f"Failed to write file paths to {output_path}: {e}")
         raise

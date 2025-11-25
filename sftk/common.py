@@ -73,8 +73,8 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
-
-S3_SHAREPOINT_PATH = os.path.join("spyfish_metadata", "sharepoint_lists")
+S3_SPYFISH_METADATA = os.path.join("spyfish_metadata")
+S3_SHAREPOINT_PATH = os.path.join(S3_SPYFISH_METADATA, "sharepoint_lists")
 # Both 'Deployment' and 'Movies' exist because 'Deployment' is the term used in SharePoint,
 # while 'Movies' is the equivalent term used in KSO (for example, accessed via keyword in
 # the Sharepoint to kso copy workflow)
@@ -90,7 +90,7 @@ S3_SHAREPOINT_RESERVES_CSV = os.path.join(S3_SHAREPOINT_PATH, "Marine Reserves.c
 S3_SHAREPOINT_TEST_CSV = os.path.join(S3_SHAREPOINT_PATH, "Test.csv")
 
 # S3 KSO Files
-S3_KSO_PATH = os.path.join("spyfish_metadata", "kso_csvs")
+S3_KSO_PATH = os.path.join(S3_SPYFISH_METADATA, "kso_csvs")
 S3_KSO_ANNOTATIONS_CSV = os.path.join(S3_KSO_PATH, "annotations_buv_doc.csv")
 S3_KSO_MOVIE_CSV = os.path.join(S3_KSO_PATH, "movies_buv_doc.csv")
 S3_KSO_SITE_CSV = os.path.join(S3_KSO_PATH, "sites_buv_doc.csv")
@@ -99,11 +99,20 @@ S3_KSO_SURVEY_CSV = os.path.join(S3_KSO_PATH, "surveys_buv_doc.csv")
 S3_KSO_ERRORS_CSV = os.path.join(S3_KSO_PATH, "errors_buv_doc.csv")
 S3_KSO_TEST_CSV = os.path.join(S3_KSO_PATH, "test_buv_doc.csv")
 
+# Metadata
+S3_ERRORS_CSV = os.path.join(S3_SPYFISH_METADATA, "errors_buv_doc.csv")
+S3_MISSING_FILES = os.path.join(S3_SPYFISH_METADATA, "missing_files_in_aws.txt")
+S3_EXTRA_FILES = os.path.join(S3_SPYFISH_METADATA, "extra_files_in_aws.txt")
+
 
 # Specific Column names used in Sharepoint
 # TODO create variables for all columns used below
-DROPID_COLUMN = "DropID"
+# TODO check templates that use these column names hardcoded
+DROP_ID_COLUMN = "DropID"
+SURVEY_ID_COLUMN = "SurveyID"
+SITE_ID_COLUMN = "SiteID"
 REPLICATE_COLUMN = "ReplicateWithinSite"
+FILE_NAME_COLUMN = "FileName"
 
 
 # Keywords to monitor in email
@@ -114,9 +123,9 @@ KEYWORDS = [
     "species",
 ]
 KEYWORD_LOOKUP = {
-    "survey": "SurveyID",
-    "site": "SiteID",
-    "movie": DROPID_COLUMN,
+    "survey": SURVEY_ID_COLUMN,
+    "site": SITE_ID_COLUMN,
+    "movie": DROP_ID_COLUMN,
     "species": "ScientificName",
 }
 
@@ -134,23 +143,23 @@ VALIDATION_RULES = {
         "file_name": S3_SHAREPOINT_DEPLOYMENT_CSV,
         # TODO add fps, sampling start and end etc.
         "required": [
-            DROPID_COLUMN,
-            "SurveyID",
-            "SiteID",
+            DROP_ID_COLUMN,
+            SURVEY_ID_COLUMN,
+            SITE_ID_COLUMN,
             "FileName",
             "LinkToVideoFile",
         ],
-        "unique": [DROPID_COLUMN],
-        "info_columns": ["SurveyID", "SiteID"],
-        "foreign_keys": {"surveys": "SurveyID", "sites": "SiteID"},
+        "unique": [DROP_ID_COLUMN],
+        "info_columns": [SURVEY_ID_COLUMN, SITE_ID_COLUMN],
+        "foreign_keys": {"surveys": SURVEY_ID_COLUMN, "sites": SITE_ID_COLUMN},
         "relationships": [
             {
-                "column": DROPID_COLUMN,
+                "column": DROP_ID_COLUMN,
                 "rule": "equals",
                 "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             },
             {
-                "column": "FileName",
+                "column": FILE_NAME_COLUMN,
                 "rule": "equals",
                 "template": "{DropID}.mp4",
                 "allowed_values": ["NO VIDEO BAD DEPLOYMENT"],
@@ -169,8 +178,8 @@ VALIDATION_RULES = {
     },
     "surveys": {
         "file_name": S3_SHAREPOINT_SURVEY_CSV,
-        "required": ["SurveyID"],
-        "unique": ["SurveyID"],
+        "required": [SURVEY_ID_COLUMN],
+        "unique": [SURVEY_ID_COLUMN],
         "info_columns": ["SurveyName"],
         # TODO it flags the missing surveys in Deployments,
         # maybe ok even tho it technically isn't a foreign key
@@ -181,8 +190,8 @@ VALIDATION_RULES = {
     },
     "sites": {
         "file_name": S3_SHAREPOINT_SITE_CSV,
-        "required": ["SiteID"],
-        "unique": ["SiteID"],
+        "required": [SITE_ID_COLUMN],
+        "unique": [SITE_ID_COLUMN],
         "info_columns": ["SiteName", "LinkToMarineReserve"],
         "foreign_keys": {},
         "relationships": [],
@@ -227,7 +236,7 @@ FILE_PRESENCE_RULES = {
 
 
 VALIDATION_PATTERNS = {
-    DROPID_COLUMN: r"^[A-Z]{3}_\d{8}_BUV_[A-Z]{3}_\d{3}_\d{2}$",
-    "SurveyID": r"^[A-Z]{3}_\d{8}_BUV$",
-    "SiteID": r"^[A-Z]{3}_\d+$",
+    DROP_ID_COLUMN: r"^[A-Z]{3}_\d{8}_BUV_[A-Z]{3}_\d{3}_\d{2}$",
+    SURVEY_ID_COLUMN: r"^[A-Z]{3}_\d{8}_BUV$",
+    SITE_ID_COLUMN: r"^[A-Z]{3}_\d+$",
 }

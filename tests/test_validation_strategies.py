@@ -328,7 +328,7 @@ def test_validation_config_methods_consistency():
 
 def test_relationship_validator_dropid_replicate_mismatch():
     """RelationshipValidator should provide specific error message for DropID replicate mismatch."""
-    from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+    from sftk.common import DROP_ID_COLUMN
     from sftk.validation_strategies import RelationshipValidator
 
     validator = RelationshipValidator({})
@@ -338,7 +338,7 @@ def test_relationship_validator_dropid_replicate_mismatch():
         "file_name": "test.csv",
         "relationships": [
             {
-                "column": DROPID_COLUMN,
+                "column": DROP_ID_COLUMN,
                 "rule": "equals",
                 "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             }
@@ -369,7 +369,7 @@ def test_relationship_validator_dropid_replicate_mismatch():
 
 def test_relationship_validator_dropid_full_mismatch():
     """RelationshipValidator should provide generic error message for full DropID mismatch."""
-    from sftk.common import DROPID_COLUMN, REPLICATE_COLUMN
+    from sftk.common import DROP_ID_COLUMN
     from sftk.validation_strategies import RelationshipValidator
 
     validator = RelationshipValidator({})
@@ -378,7 +378,7 @@ def test_relationship_validator_dropid_full_mismatch():
         "file_name": "test.csv",
         "relationships": [
             {
-                "column": DROPID_COLUMN,
+                "column": DROP_ID_COLUMN,
                 "rule": "equals",
                 "template": "{SurveyID}_{SiteID}_{ReplicateWithinSite:02}",
             }

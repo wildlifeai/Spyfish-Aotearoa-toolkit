@@ -6,6 +6,8 @@ build/
 
 # old repo, to merge relevant files with the new one
 spyfish_analysis/
+*/export/*
+
 
 *__pycache__*
 *.egg-info

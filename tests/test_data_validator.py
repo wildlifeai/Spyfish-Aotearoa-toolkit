@@ -109,6 +109,7 @@ def test_data_validator_with_file_presence():
 
 def test_data_validator_export_file_differences():
     """DataValidator should export file differences using existing validator."""
+    import os
     import tempfile
     from unittest.mock import Mock, patch
 
@@ -128,20 +129,33 @@ def test_data_validator_export_file_differences():
         # Replace the file presence validator in the strategy registry
         validator.strategy_registry.strategies["file_presence"] = mock_file_validator
 
-        # Create temporary files for output
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as missing_file:
-            missing_path = missing_file.name
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as extra_file:
-            extra_path = extra_file.name
+        # Create a temporary directory for output files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Set FOLDER_PATH to the temporary directory
+            validator.FOLDER_PATH = temp_dir
 
-        try:
-            # Test the export method
-            validator.export_file_differences(missing_path, extra_path)
+            # Define filenames
+            missing_filename = "missing_files_in_aws.txt"
+            extra_filename = "extra_files_in_aws.txt"
+
+            # Test the export method with custom filenames
+            validator.export_file_differences(
+                missing_file_name=missing_filename, extra_file_name=extra_filename
+            )
 
             # Verify the method was called
             mock_file_validator.get_file_differences.assert_called_once()
 
+            # Construct full paths to the files that were written
+            missing_path = os.path.join(temp_dir, missing_filename)
+            extra_path = os.path.join(temp_dir, extra_filename)
+
             # Verify files were created and contain expected content
+            assert os.path.exists(
+                missing_path
+            ), f"Missing file not created at {missing_path}"
+            assert os.path.exists(extra_path), f"Extra file not created at {extra_path}"
+
             with open(missing_path, "r") as f:
                 missing_content = f.read().strip()
             with open(extra_path, "r") as f:
@@ -149,12 +163,3 @@ def test_data_validator_export_file_differences():
 
             assert missing_content == "missing_file.mp4"
             assert extra_content == "extra_file.mp4"
-
-        finally:
-            # Clean up
-            import os
-
-            if os.path.exists(missing_path):
-                os.remove(missing_path)
-            if os.path.exists(extra_path):
-                os.remove(extra_path)
