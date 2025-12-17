@@ -251,20 +251,11 @@ class DataValidator:
         Export all clean dataframes to CSV files.
 
         Exports each clean dataframe (rows with no validation errors) to separate
-        CSV files in the specified directory. Files are named with the pattern
-        "clean_{dataset_name}.csv".
-
-        Args:
-            output_directory (str): Directory path where CSV files will be saved.
-                The directory must exist.
-
-        Side Effects:
-            - Creates CSV files for each clean dataframe in the output directory
-            - Logs the export operation for each dataset
+        CSV files. Files are named with the pattern "clean_{dataset_name}.csv"
+        and exported to self.FOLDER_PATH (local or S3 depending on EXPORT_LOCAL).
 
         Raises:
             ValueError: If no clean dataframes are available (clean row tracking not enabled)
-            OSError: If the output directory doesn't exist or isn't writable
 
         Note:
             - Only available when extract_clean_dataframes was enabled in ValidationConfig

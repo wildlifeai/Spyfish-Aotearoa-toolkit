@@ -180,53 +180,47 @@ class TestComprehensiveValidation:
 
         # Check required validation (Row 1 has missing DropID)
         required_errors = [
-            e
-            for e in errors
-            if e.error_source == ErrorSource.MISSING_REQUIRED_VALUE.value
+            e for e in errors if e.ErrorType == ErrorSource.MISSING_REQUIRED_VALUE.value
         ]
         assert len(required_errors) == 1
-        assert "DropID" in required_errors[0].error_info
+        assert "DropID" in required_errors[0].ErrorMessage
 
         # Check unique validation (Rows 4 and 5 have duplicate DropID)
         unique_errors = [
-            e for e in errors if e.error_source == ErrorSource.DUPLICATE_VALUE.value
+            e for e in errors if e.ErrorType == ErrorSource.DUPLICATE_VALUE.value
         ]
         assert len(unique_errors) == 2
 
         # Check format validation (Row 2 has invalid DropID format)
         format_errors = [
-            e for e in errors if e.error_source == ErrorSource.INVALID_FORMAT.value
+            e for e in errors if e.ErrorType == ErrorSource.INVALID_FORMAT.value
         ]
         assert len(format_errors) == 1
-        assert "INVALID_FORMAT" in format_errors[0].error_info
+        assert "INVALID_FORMAT" in format_errors[0].InvalidValue
 
         # Check foreign key validation (Row 6 has invalid SurveyID)
         fk_errors = [
-            e
-            for e in errors
-            if e.error_source == ErrorSource.FOREIGN_KEY_NOT_FOUND.value
+            e for e in errors if e.ErrorType == ErrorSource.FOREIGN_KEY_NOT_FOUND.value
         ]
         assert len(fk_errors) == 1
-        assert "INVALID_SURVEY" in fk_errors[0].error_info
+        assert "INVALID_SURVEY" in fk_errors[0].ErrorMessage
 
         # Check value range validation (Rows 5 and 6 have out-of-range lat/long)
         range_errors = [
-            e for e in errors if e.error_source == ErrorSource.VALUE_OUT_OF_RANGE.value
+            e for e in errors if e.ErrorType == ErrorSource.VALUE_OUT_OF_RANGE.value
         ]
         assert len(range_errors) == 4  # 2 lat + 2 lon errors
 
         # Check replicate mismatch (Row 7 has wrong replicate in DropID)
         replicate_errors = [
-            e for e in errors if e.error_source == ErrorSource.REPLICATE_MISMATCH.value
+            e for e in errors if e.ErrorType == ErrorSource.REPLICATE_MISMATCH.value
         ]
         assert len(replicate_errors) == 1
-        assert "99" in replicate_errors[0].error_info  # Wrong replicate suffix
+        assert "99" in replicate_errors[0].ErrorMessage  # Wrong replicate suffix
 
         # Check relationship mismatch (Row 2 has completely wrong DropID format)
         relationship_errors = [
-            e
-            for e in errors
-            if e.error_source == ErrorSource.RELATIONSHIP_MISMATCH.value
+            e for e in errors if e.ErrorType == ErrorSource.RELATIONSHIP_MISMATCH.value
         ]
         assert len(relationship_errors) >= 1
 
@@ -237,6 +231,27 @@ class TestComprehensiveValidation:
         assert (
             len(clean_indices) == 2
         ), f"Expected 2 clean rows, got {len(clean_indices)}"
+
+    def test_missing_columns(self):
+        """DatasetValidator should report missing required and format columns."""
+        df = pd.DataFrame({"SurveyID": ["AKA_20231215_BUV"]})  # Missing DropID column
+
+        rules = {
+            "file_name": "deployments.csv",
+            "required": ["DropID", "SurveyID"],  # DropID column doesn't exist
+            "formats": ["DropID"],  # DropID column doesn't exist
+        }
+
+        validator = DatasetValidator(rules, VALIDATION_PATTERNS, {}, None)
+        errors = validator.validate(df, "deployments")
+
+        missing_col_errors = [
+            e for e in errors if e.ErrorType == ErrorSource.MISSING_COLUMN.value
+        ]
+        assert len(missing_col_errors) == 2  # One for required, one for format
+        assert all(e.ColumnName == "DropID" for e in missing_col_errors)
+        assert any("Required column" in e.ErrorMessage for e in missing_col_errors)
+        assert any("Format column" in e.ErrorMessage for e in missing_col_errors)
 
     def test_file_presence_validation(self):
         """FilePresenceValidator should find missing and extra files."""
@@ -266,15 +281,15 @@ class TestComprehensiveValidation:
 
         # Check error sources
         missing_errors = [
-            e for e in errors if e.error_source == ErrorSource.FILE_MISSING.value
+            e for e in errors if e.ErrorType == ErrorSource.FILE_MISSING.value
         ]
         extra_errors = [
-            e for e in errors if e.error_source == ErrorSource.FILE_EXTRA.value
+            e for e in errors if e.ErrorType == ErrorSource.FILE_EXTRA.value
         ]
         assert len(missing_errors) == 1
         assert len(extra_errors) == 1
-        assert "file2.mp4" in missing_errors[0].error_info
-        assert "file4.mp4" in extra_errors[0].error_info
+        assert "file2.mp4" in missing_errors[0].ErrorMessage
+        assert "file4.mp4" in extra_errors[0].ErrorMessage
 
 
 class TestDataValidator:

@@ -15,7 +15,6 @@ Provides simple validation functions and a DatasetValidator class:
 
 import logging
 import os
-import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
@@ -32,15 +31,20 @@ from sftk.utils import normalize_file_name
 
 @dataclass
 class ErrorChecking:
-    """Data class for validation errors."""
+    """Data class for validation errors for dashboard display."""
 
-    survey_id: Optional[str]
-    drop_id: Optional[str]
-    column_name: Optional[str]
-    relevant_column_value: Optional[str]
-    relevant_file: str
-    error_info: str
-    error_source: str
+    # Record identifiers (for tracing back to source data)
+    SurveyID: Optional[str]
+    DropID: Optional[str]
+
+    # Error classification
+    ErrorType: str  # Category of error (e.g., "Missing Required Value")
+    FileName: str  # Source file where error occurred
+    ColumnName: Optional[str]  # Column that has the error
+
+    # Error details
+    ErrorMessage: str  # Human-readable error description
+    InvalidValue: Optional[str]  # The problematic value
 
 
 class ErrorSource(Enum):
@@ -51,7 +55,6 @@ class ErrorSource(Enum):
     DUPLICATE_VALUE = "Duplicate Value"
     INVALID_FORMAT = "Invalid Format"
     VALUE_OUT_OF_RANGE = "Value Out of Range"
-    INVALID_VALUE = "Invalid Value"
     FOREIGN_KEY_NOT_FOUND = "Foreign Key Not Found"
     RELATIONSHIP_MISMATCH = "Relationship Mismatch"
     REPLICATE_MISMATCH = "Replicate Mismatch"
@@ -109,13 +112,15 @@ def create_error(
 ) -> ErrorChecking:
     """Create an ErrorChecking object - single consolidated error factory."""
     return ErrorChecking(
-        survey_id=survey_id,
-        drop_id=drop_id,
-        column_name=column_name,
-        relevant_column_value=relevant_column_value,
-        relevant_file=normalize_file_name(file_name),
-        error_info=message,
-        error_source=error_source,
+        SurveyID=survey_id,
+        DropID=drop_id,
+        ErrorType=error_source,
+        FileName=normalize_file_name(file_name),
+        ColumnName=column_name,
+        ErrorMessage=message,
+        InvalidValue=(
+            str(relevant_column_value) if relevant_column_value is not None else None
+        ),
     )
 
 
@@ -152,14 +157,15 @@ def validate_unique(
         for idx, row in duplicated.iterrows():
             if len(errors) >= max_errors:
                 break
+            dup_value = row[col]
             errors.append(
                 create_error(
                     survey_id=row.get(SURVEY_ID_COLUMN, ""),
                     drop_id=row.get(DROP_ID_COLUMN, ""),
-                    message=f"Duplicate value in unique column '{col}'",
+                    message=f"Duplicate value '{dup_value}' in unique column '{col}'",
                     error_source=ErrorSource.DUPLICATE_VALUE.value,
                     column_name=col,
-                    relevant_column_value=row[col],
+                    relevant_column_value=dup_value,
                     file_name=file_name,
                 )
             )
@@ -253,72 +259,94 @@ def validate_foreign_keys(
 
 
 def validate_required(
-    row: pd.Series,
+    df: pd.DataFrame,
     rules: Dict[str, Any],
     file_name: str,
+    tracker: Optional[CleanRowTracker] = None,
+    dataset_name: Optional[str] = None,
 ) -> List[ErrorChecking]:
-    """Check required columns for a single row."""
+    """Check required columns have values (vectorized)."""
     errors = []
     required_cols = rules.get("required", [])
     info_columns = rules.get("info_columns", [])
-    survey_id = row.get(SURVEY_ID_COLUMN, "")
-    drop_id = row.get(DROP_ID_COLUMN, "")
 
     for col in required_cols:
-        if col not in row.index:
+        if col not in df.columns:
             continue
-        value = row[col]
-        if pd.isna(value) or value == "" or value is None:
-            help_info = " ".join(
-                [f"{ic}: {row.get(ic, '')}" for ic in info_columns if ic in row.index]
+
+        # Vectorized: find rows with missing values (NA, empty string, or None)
+        is_missing = df[col].isna() | (df[col] == "")
+        missing_rows = df[is_missing]
+
+        for idx, row in missing_rows.iterrows():
+            help_info = ", ".join(
+                [f"{ic}: {row.get(ic, '')}" for ic in info_columns if ic in df.columns]
             )
+            message = f"Missing value in required column '{col}'"
+            if help_info:
+                message += f" ({help_info})"
             errors.append(
                 create_error(
-                    survey_id=survey_id,
-                    drop_id=drop_id,
-                    message=f"Missing value in required column '{col}', help_info: {help_info}.",
+                    survey_id=row.get(SURVEY_ID_COLUMN, ""),
+                    drop_id=row.get(DROP_ID_COLUMN, ""),
+                    message=message,
                     error_source=ErrorSource.MISSING_REQUIRED_VALUE.value,
                     column_name=col,
-                    relevant_column_value=help_info,
+                    relevant_column_value=None,
                     file_name=file_name,
                 )
             )
+            if tracker and dataset_name:
+                tracker.mark_row_as_error(idx, dataset_name)
+
     return errors
 
 
 def validate_formats(
-    row: pd.Series,
+    df: pd.DataFrame,
     rules: Dict[str, Any],
     patterns: Dict[str, str],
     file_name: str,
+    tracker: Optional[CleanRowTracker] = None,
+    dataset_name: Optional[str] = None,
 ) -> List[ErrorChecking]:
-    """Check format patterns for a single row.
+    """Check format patterns (vectorized).
 
     Args:
-        row: DataFrame row to validate
+        df: DataFrame to validate
         rules: Validation rules containing 'formats' as a list of column names
         patterns: Dict mapping column names to regex patterns
         file_name: Name of the file being validated
+        tracker: Optional CleanRowTracker for tracking error rows
+        dataset_name: Name of the dataset being validated
     """
     errors = []
     format_columns = rules.get("formats", [])
-    survey_id = row.get(SURVEY_ID_COLUMN, "")
-    drop_id = row.get(DROP_ID_COLUMN, "")
 
     for col in format_columns:
-        if col not in row.index:
-            continue
-        value = row[col]
-        if pd.isna(value) or value == "":
+        if col not in df.columns:
             continue
         pattern = patterns.get(col)
         if not pattern:
             continue
-        if not re.match(pattern, str(value)):
+
+        # Vectorized: filter non-empty values, then check pattern match
+        non_empty_mask = df[col].notna() & (df[col] != "")
+        non_empty_df = df[non_empty_mask]
+
+        if non_empty_df.empty:
+            continue
+
+        # Vectorized regex match using str.match()
+        matches = non_empty_df[col].astype(str).str.match(pattern)
+        invalid_rows = non_empty_df[~matches]
+
+        for idx, row in invalid_rows.iterrows():
+            value = row[col]
             errors.append(
                 create_error(
-                    survey_id=survey_id,
-                    drop_id=drop_id,
+                    survey_id=row.get(SURVEY_ID_COLUMN, ""),
+                    drop_id=row.get(DROP_ID_COLUMN, ""),
                     message=f"Value '{value}' does not match required format for {col}",
                     error_source=ErrorSource.INVALID_FORMAT.value,
                     column_name=col,
@@ -326,61 +354,70 @@ def validate_formats(
                     file_name=file_name,
                 )
             )
+            if tracker and dataset_name:
+                tracker.mark_row_as_error(idx, dataset_name)
+
     return errors
 
 
 def validate_values(
-    row: pd.Series,
+    df: pd.DataFrame,
     rules: Dict[str, Any],
     file_name: str,
+    tracker: Optional[CleanRowTracker] = None,
+    dataset_name: Optional[str] = None,
 ) -> List[ErrorChecking]:
-    """Check value ranges for a single row."""
+    """Check value ranges (vectorized)."""
     errors = []
     value_rules = rules.get("values", [])
-    survey_id = row.get(SURVEY_ID_COLUMN, "")
-    drop_id = row.get(DROP_ID_COLUMN, "")
 
     for value_rule in value_rules:
         col = value_rule["column"]
-        if col not in row.index:
-            continue
-        actual = row[col]
-        allowed_values = value_rule.get("allowed_values", [])
-        if actual in allowed_values or pd.isna(actual):
+        if col not in df.columns:
             continue
 
         rule = value_rule["rule"]
-        if rule == "value_range":
-            value_range = value_rule.get("range")
-            if not value_range or len(value_range) != 2:
-                continue
-            try:
-                actual_numeric = float(actual)
-            except (ValueError, TypeError):
-                errors.append(
-                    create_error(
-                        survey_id=survey_id,
-                        drop_id=drop_id,
-                        message=f"{col} value '{actual}' is not a valid number",
-                        error_source=ErrorSource.INVALID_VALUE.value,
-                        column_name=col,
-                        relevant_column_value=actual,
-                        file_name=file_name,
-                    )
+        if rule != "value_range":
+            continue
+
+        value_range = value_rule.get("range")
+        if not value_range or len(value_range) != 2:
+            continue
+
+        allowed_values = value_rule.get("allowed_values", [])
+
+        # Vectorized: convert to numeric, filter out allowed values and NA
+        numeric_col = pd.to_numeric(df[col], errors="coerce")
+        is_valid_numeric = numeric_col.notna()
+
+        # Exclude allowed values
+        if allowed_values:
+            is_allowed = df[col].isin(allowed_values)
+            is_valid_numeric = is_valid_numeric & ~is_allowed
+
+        # Vectorized range check
+        out_of_range = is_valid_numeric & (
+            (numeric_col < value_range[0]) | (numeric_col > value_range[1])
+        )
+        invalid_rows = df[out_of_range]
+
+        for idx, row in invalid_rows.iterrows():
+            actual = row[col]
+            actual_numeric = float(actual)
+            errors.append(
+                create_error(
+                    survey_id=row.get(SURVEY_ID_COLUMN, ""),
+                    drop_id=row.get(DROP_ID_COLUMN, ""),
+                    message=f"{col} value {actual_numeric} is outside valid range [{value_range[0]}, {value_range[1]}]",
+                    error_source=ErrorSource.VALUE_OUT_OF_RANGE.value,
+                    column_name=col,
+                    relevant_column_value=actual,
+                    file_name=file_name,
                 )
-                continue
-            if not (value_range[0] <= actual_numeric <= value_range[1]):
-                errors.append(
-                    create_error(
-                        survey_id=survey_id,
-                        drop_id=drop_id,
-                        message=f"{col} value {actual_numeric} is outside valid range [{value_range[0]}, {value_range[1]}]",
-                        error_source=ErrorSource.VALUE_OUT_OF_RANGE.value,
-                        column_name=col,
-                        relevant_column_value=actual,
-                        file_name=file_name,
-                    )
-                )
+            )
+            if tracker and dataset_name:
+                tracker.mark_row_as_error(idx, dataset_name)
+
     return errors
 
 
@@ -392,29 +429,43 @@ def _is_replicate_mismatch_only(actual: str, expected: str) -> bool:
 
 
 def validate_relationships(
-    row: pd.Series,
+    df: pd.DataFrame,
     rules: Dict[str, Any],
     file_name: str,
+    tracker: Optional[CleanRowTracker] = None,
+    dataset_name: Optional[str] = None,
 ) -> List[ErrorChecking]:
-    """Check column relationships for a single row."""
+    """Check column relationships (vectorized where possible)."""
     errors = []
     relationships = rules.get("relationships", [])
-    survey_id = row.get(SURVEY_ID_COLUMN, "")
-    drop_id = row.get(DROP_ID_COLUMN, "")
 
     for relationship in relationships:
         col = relationship["column"]
-        if col not in row.index:
-            continue
-        actual = row[col]
-        allowed_values = relationship.get("allowed_values", [])
-        is_null_allowed = relationship.get("allow_null")
-        if (actual in allowed_values) or (is_null_allowed and pd.isna(actual)):
+        if col not in df.columns:
             continue
 
         rule = relationship["rule"]
-        if rule == "equals":
-            template = relationship.get("template", "")
+        if rule != "equals":
+            continue
+
+        template = relationship.get("template", "")
+        allowed_values = relationship.get("allowed_values", [])
+        is_null_allowed = relationship.get("allow_null")
+
+        # Pre-filter: exclude allowed values and nulls (if allowed)
+        needs_check = pd.Series(True, index=df.index)
+        if allowed_values:
+            needs_check = needs_check & ~df[col].isin(allowed_values)
+        if is_null_allowed:
+            needs_check = needs_check & df[col].notna()
+
+        rows_to_check = df[needs_check]
+
+        for idx, row in rows_to_check.iterrows():
+            actual = row[col]
+            survey_id = row.get(SURVEY_ID_COLUMN, "")
+            drop_id = row.get(DROP_ID_COLUMN, "")
+
             try:
                 expected = template.format(**row)
             except KeyError as e:
@@ -428,6 +479,8 @@ def validate_relationships(
                         file_name=file_name,
                     )
                 )
+                if tracker and dataset_name:
+                    tracker.mark_row_as_error(idx, dataset_name)
                 continue
 
             if str(actual) != str(expected):
@@ -450,6 +503,9 @@ def validate_relationships(
                         file_name=file_name,
                     )
                 )
+                if tracker and dataset_name:
+                    tracker.mark_row_as_error(idx, dataset_name)
+
     return errors
 
 
@@ -501,6 +557,7 @@ class FilePresenceValidator:
                         message=f"File {file_path} not found in AWS, but found in {csv_filename}",
                         relevant_column_value=file_path,
                         error_source=ErrorSource.FILE_MISSING.value,
+                        file_name=csv_filename,
                     )
                 )
 
@@ -515,6 +572,7 @@ class FilePresenceValidator:
                         message=f"File {file_path} found in AWS but not in {csv_filename}",
                         relevant_column_value=file_path,
                         error_source=ErrorSource.FILE_EXTRA.value,
+                        file_name=csv_filename,
                     )
                 )
         except Exception as e:
@@ -589,10 +647,13 @@ class DatasetValidator:
         self.file_name = normalize_file_name(rules.get("file_name", ""))
 
     def validate(self, df: pd.DataFrame, dataset_name: str) -> List[ErrorChecking]:
-        """Validate the dataset with all rules."""
+        """Validate the dataset with all rules (vectorized)."""
         errors = []
 
-        # Dataset-level validations
+        # Check for missing required columns (once per dataset)
+        errors.extend(self._check_missing_columns(df))
+
+        # Dataset-level validations (already vectorized)
         errors.extend(validate_unique(df, self.rules, self.tracker, dataset_name))
         errors.extend(
             validate_foreign_keys(
@@ -600,21 +661,60 @@ class DatasetValidator:
             )
         )
 
-        # Row-level validations (single pass through rows)
-        for idx, row in df.iterrows():
-            row_errors = self._validate_row(row)
-            if row_errors:
-                errors.extend(row_errors)
-                if self.tracker:
-                    self.tracker.mark_row_as_error(idx, dataset_name)
+        # Vectorized validations (no longer row-by-row)
+        errors.extend(
+            validate_required(
+                df, self.rules, self.file_name, self.tracker, dataset_name
+            )
+        )
+        errors.extend(
+            validate_formats(
+                df,
+                self.rules,
+                self.patterns,
+                self.file_name,
+                self.tracker,
+                dataset_name,
+            )
+        )
+        errors.extend(
+            validate_values(df, self.rules, self.file_name, self.tracker, dataset_name)
+        )
+        errors.extend(
+            validate_relationships(
+                df, self.rules, self.file_name, self.tracker, dataset_name
+            )
+        )
 
         return errors
 
-    def _validate_row(self, row: pd.Series) -> List[ErrorChecking]:
-        """Validate a single row with all row-level validations."""
+    def _check_missing_columns(self, df: pd.DataFrame) -> List[ErrorChecking]:
+        """Check if required or format columns are missing from the dataframe."""
         errors = []
-        errors.extend(validate_required(row, self.rules, self.file_name))
-        errors.extend(validate_formats(row, self.rules, self.patterns, self.file_name))
-        errors.extend(validate_values(row, self.rules, self.file_name))
-        errors.extend(validate_relationships(row, self.rules, self.file_name))
+        df_columns = set(df.columns)
+
+        # Check required columns
+        for col in self.rules.get("required", []):
+            if col not in df_columns:
+                errors.append(
+                    create_error(
+                        message=f"Required column '{col}' not found in dataset",
+                        error_source=ErrorSource.MISSING_COLUMN.value,
+                        column_name=col,
+                        file_name=self.file_name,
+                    )
+                )
+
+        # Check format columns
+        for col in self.rules.get("formats", []):
+            if col not in df_columns:
+                errors.append(
+                    create_error(
+                        message=f"Format column '{col}' not found in dataset",
+                        error_source=ErrorSource.MISSING_COLUMN.value,
+                        column_name=col,
+                        file_name=self.file_name,
+                    )
+                )
+
         return errors
