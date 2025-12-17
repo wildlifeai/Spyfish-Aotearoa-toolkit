@@ -96,10 +96,9 @@ S3_KSO_MOVIE_CSV = os.path.join(S3_KSO_PATH, "movies_buv_doc.csv")
 S3_KSO_SITE_CSV = os.path.join(S3_KSO_PATH, "sites_buv_doc.csv")
 S3_KSO_SPECIES_CSV = os.path.join(S3_KSO_PATH, "species_buv_doc.csv")
 S3_KSO_SURVEY_CSV = os.path.join(S3_KSO_PATH, "surveys_buv_doc.csv")
-S3_KSO_ERRORS_CSV = os.path.join(S3_KSO_PATH, "errors_buv_doc.csv")
 S3_KSO_TEST_CSV = os.path.join(S3_KSO_PATH, "test_buv_doc.csv")
 
-# Metadata
+# Validation output files
 S3_ERRORS_CSV = os.path.join(S3_SPYFISH_METADATA, "errors_buv_doc.csv")
 S3_MISSING_FILES = os.path.join(S3_SPYFISH_METADATA, "missing_files_in_aws.txt")
 S3_EXTRA_FILES = os.path.join(S3_SPYFISH_METADATA, "extra_files_in_aws.txt")
@@ -178,12 +177,28 @@ VALIDATION_RULES = {
                 "allow_null": True,
             },
         ],
+        "values": [
+            # TODO the Lat and Long ranges are approximate,correct area
+            {
+                "column": "Latitude",
+                "rule": "value_range",
+                "range": [-46, -36],
+                "allowed_values": [0],
+            },
+            {
+                "column": "Longitude",
+                "rule": "value_range",
+                "range": [170, 178.5],
+                "allowed_values": [0],
+            },
+        ],
     },
     "surveys": {
         "file_name": S3_SHAREPOINT_SURVEY_CSV,
         "required": [SURVEY_ID_COLUMN],
         "unique": [SURVEY_ID_COLUMN],
         "info_columns": ["SurveyName"],
+        "formats": [SURVEY_ID_COLUMN],
         # TODO it flags the missing surveys in Deployments,
         # maybe ok even tho it technically isn't a foreign key
         "foreign_keys": {
@@ -193,9 +208,10 @@ VALIDATION_RULES = {
     },
     "sites": {
         "file_name": S3_SHAREPOINT_SITE_CSV,
-        "required": [SITE_ID_COLUMN],
-        "unique": [SITE_ID_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "required": [SITE_ID_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "unique": [SITE_ID_COLUMN],
         "info_columns": [SITE_NAME_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "formats": [SITE_ID_COLUMN],
         "foreign_keys": {},
         "relationships": [],
     },
@@ -229,10 +245,10 @@ FILE_PRESENCE_RULES = {
         "s3_sharepoint_path": S3_SHAREPOINT_PATH,
         "csv_filename": "BUV Deployment.csv",
         "csv_column_to_extract": "LinkToVideoFile",
-        "column_filter": "IsBadDeployment",
-        "column_value": False,
-        # "column_filter": None,
-        # "column_value": None,
+        # "column_filter": "IsBadDeployment",
+        # "column_value": False,
+        "column_filter": None,
+        "column_value": None,
         "valid_extensions": MOVIE_EXTENSIONS,
         "path_prefix": "media",
     }

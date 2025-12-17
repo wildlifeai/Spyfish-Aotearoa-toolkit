@@ -592,12 +592,22 @@ class S3Handler:
                 logging.info(f"⛭ Renaming: {old_name} ➜ {new_name}")
                 try:
                     if not try_run:
-                        # Use the higher-level copy method which handles multipart copies for large files
-                        copy_source = {"Bucket": self.bucket, "Key": old_name}
-                        self.s3.copy(copy_source, self.bucket, new_name)
-                        # Delete the old object
-                        self.s3.delete_object(Bucket=self.bucket, Key=old_name)
-                        logging.info(f"✅ Renamed: {old_name} ➜ {new_name}")
+                        try:
+                            self.s3.head_object(Bucket=self.bucket, Key=new_name)
+                            failed_renames.append(("FileExists", old_name, new_name))
+                            logging.info(
+                                f"❌ There is a file under the existing name: {new_name}, skipping rename."
+                            )
+                        except ClientError as e:
+                            if e.response["Error"]["Code"] == "404":
+                                copy_source = {"Bucket": self.bucket, "Key": old_name}
+                                self.s3.copy(copy_source, self.bucket, new_name)
+                                # Delete the old object
+                                self.s3.delete_object(Bucket=self.bucket, Key=old_name)
+                                logging.info(f"✅ Renamed: {old_name} ➜ {new_name}")
+                            else:
+                                raise
+
                 except BotoCoreError as e:
                     logging.warning(
                         f"Failed to rename {old_name} to {new_name}, error: {str(e)}"
