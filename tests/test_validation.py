@@ -21,6 +21,7 @@ from sftk.common import VALIDATION_PATTERNS
 from sftk.validation_strategies import (
     CleanRowTracker,
     DatasetValidator,
+    ErrorSource,
     FilePresenceValidator,
     ValidationConfig,
 )
@@ -55,6 +56,7 @@ class TestComprehensiveValidation:
     - Row 4: Duplicate DropID (same as Row 5)
     - Row 5: Duplicate DropID (same as Row 4) + Latitude/Longitude out of range
     - Row 6: Foreign key violation (invalid SurveyID reference) + out of range coords
+    - Row 7: Replicate mismatch only (DropID ends with wrong replicate number)
     """
 
     @pytest.fixture
@@ -70,6 +72,7 @@ class TestComprehensiveValidation:
                     "AKA_20231216_BUV_AKA_002_01",  # Row 4: Duplicate of Row 5
                     "AKA_20231216_BUV_AKA_002_01",  # Row 5: Duplicate of Row 4 + bad coords
                     "AKA_20231217_BUV_AKA_003_01",  # Row 6: Valid format, FK violation
+                    "AKA_20231218_BUV_AKA_004_99",  # Row 7: Replicate mismatch (99 vs 01)
                 ],
                 "SurveyID": [
                     "AKA_20231215_BUV",  # Row 0: Valid
@@ -79,6 +82,7 @@ class TestComprehensiveValidation:
                     "AKA_20231216_BUV",  # Row 4: Valid
                     "AKA_20231216_BUV",  # Row 5: Valid
                     "INVALID_SURVEY",  # Row 6: FK violation - not in surveys table
+                    "AKA_20231218_BUV",  # Row 7: Valid
                 ],
                 "SiteID": [
                     "AKA_001",
@@ -88,8 +92,9 @@ class TestComprehensiveValidation:
                     "AKA_002",
                     "AKA_002",
                     "AKA_003",
+                    "AKA_004",
                 ],
-                "ReplicateWithinSite": [1, 1, 1, 2, 1, 1, 1],
+                "ReplicateWithinSite": [1, 1, 1, 2, 1, 1, 1, 1],
                 "Latitude": [
                     -40.5,
                     -40.0,
@@ -98,6 +103,7 @@ class TestComprehensiveValidation:
                     -40.5,
                     -50.0,  # Row 5: OUT OF RANGE (< -46)
                     -35.0,  # Row 6: OUT OF RANGE (> -36)
+                    -40.0,  # Row 7: Valid
                 ],
                 "Longitude": [
                     174.0,
@@ -107,6 +113,7 @@ class TestComprehensiveValidation:
                     174.0,
                     165.0,  # Row 5: OUT OF RANGE (< 170)
                     179.0,  # Row 6: OUT OF RANGE (> 178.5)
+                    175.0,  # Row 7: Valid
                 ],
             }
         )
@@ -118,6 +125,7 @@ class TestComprehensiveValidation:
                     "AKA_20231215_BUV",
                     "AKA_20231216_BUV",
                     "AKA_20231217_BUV",
+                    "AKA_20231218_BUV",
                 ],
             }
         )
@@ -127,7 +135,7 @@ class TestComprehensiveValidation:
             "required": ["DropID", "SurveyID"],
             "unique": ["DropID"],
             "info_columns": ["SurveyID", "SiteID"],
-            "formats": {"DropID": "drop_id"},
+            "formats": ["DropID"],
             "foreign_keys": {"surveys": "SurveyID"},
             "values": [
                 {
@@ -171,28 +179,56 @@ class TestComprehensiveValidation:
         errors = validator.validate(df, "deployments")
 
         # Check required validation (Row 1 has missing DropID)
-        required_errors = [e for e in errors if "Missing value" in e.error_info]
+        required_errors = [
+            e
+            for e in errors
+            if e.error_source == ErrorSource.MISSING_REQUIRED_VALUE.value
+        ]
         assert len(required_errors) == 1
         assert "DropID" in required_errors[0].error_info
 
         # Check unique validation (Rows 4 and 5 have duplicate DropID)
-        unique_errors = [e for e in errors if "Duplicate" in e.error_info]
+        unique_errors = [
+            e for e in errors if e.error_source == ErrorSource.DUPLICATE_VALUE.value
+        ]
         assert len(unique_errors) == 2
 
+        # Check format validation (Row 2 has invalid DropID format)
+        format_errors = [
+            e for e in errors if e.error_source == ErrorSource.INVALID_FORMAT.value
+        ]
+        assert len(format_errors) == 1
+        assert "INVALID_FORMAT" in format_errors[0].error_info
+
         # Check foreign key validation (Row 6 has invalid SurveyID)
-        fk_errors = [e for e in errors if "not found in" in e.error_info]
+        fk_errors = [
+            e
+            for e in errors
+            if e.error_source == ErrorSource.FOREIGN_KEY_NOT_FOUND.value
+        ]
         assert len(fk_errors) == 1
         assert "INVALID_SURVEY" in fk_errors[0].error_info
 
         # Check value range validation (Rows 5 and 6 have out-of-range lat/long)
-        lat_errors = [e for e in errors if "Latitude" in e.error_info]
-        lon_errors = [e for e in errors if "Longitude" in e.error_info]
-        assert len(lat_errors) == 2
-        assert len(lon_errors) == 2
+        range_errors = [
+            e for e in errors if e.error_source == ErrorSource.VALUE_OUT_OF_RANGE.value
+        ]
+        assert len(range_errors) == 4  # 2 lat + 2 lon errors
 
-        # Check relationship validation (Row 2 has invalid format, Row 6 has mismatch)
-        relationship_errors = [e for e in errors if "should be" in e.error_info]
-        assert len(relationship_errors) >= 2
+        # Check replicate mismatch (Row 7 has wrong replicate in DropID)
+        replicate_errors = [
+            e for e in errors if e.error_source == ErrorSource.REPLICATE_MISMATCH.value
+        ]
+        assert len(replicate_errors) == 1
+        assert "99" in replicate_errors[0].error_info  # Wrong replicate suffix
+
+        # Check relationship mismatch (Row 2 has completely wrong DropID format)
+        relationship_errors = [
+            e
+            for e in errors
+            if e.error_source == ErrorSource.RELATIONSHIP_MISMATCH.value
+        ]
+        assert len(relationship_errors) >= 1
 
         # Only rows 0 and 3 should be clean
         clean_indices = tracker.get_clean_indices("deployments")
@@ -227,14 +263,18 @@ class TestComprehensiveValidation:
 
         # file2.mp4 missing from S3, file4.mp4 extra in S3
         assert len(errors) == 2
-        error_messages = [e.error_info for e in errors]
-        assert any(
-            "file2.mp4" in msg and "not found in AWS" in msg for msg in error_messages
-        )
-        assert any(
-            "file4.mp4" in msg and "found in AWS but not" in msg
-            for msg in error_messages
-        )
+
+        # Check error sources
+        missing_errors = [
+            e for e in errors if e.error_source == ErrorSource.FILE_MISSING.value
+        ]
+        extra_errors = [
+            e for e in errors if e.error_source == ErrorSource.FILE_EXTRA.value
+        ]
+        assert len(missing_errors) == 1
+        assert len(extra_errors) == 1
+        assert "file2.mp4" in missing_errors[0].error_info
+        assert "file4.mp4" in extra_errors[0].error_info
 
 
 class TestDataValidator:

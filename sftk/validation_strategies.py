@@ -44,10 +44,23 @@ class ErrorChecking:
 
 
 class ErrorSource(Enum):
-    """Enumeration of error sources."""
+    """Enumeration of specific error sources for validation."""
 
-    SHAREPOINT_VALIDATION = "sharepoint_data_error"
-    FILE_PRESENCE_CHECK = "file_presence_check"
+    # Data validation errors - specific types
+    MISSING_REQUIRED_VALUE = "Missing Required Value"
+    DUPLICATE_VALUE = "Duplicate Value"
+    INVALID_FORMAT = "Invalid Format"
+    VALUE_OUT_OF_RANGE = "Value Out of Range"
+    INVALID_VALUE = "Invalid Value"
+    FOREIGN_KEY_NOT_FOUND = "Foreign Key Not Found"
+    RELATIONSHIP_MISMATCH = "Relationship Mismatch"
+    REPLICATE_MISMATCH = "Replicate Mismatch"
+    DATASET_LOAD_ERROR = "Dataset Load Error"
+    MISSING_COLUMN = "Missing Column"
+
+    # File presence errors
+    FILE_MISSING = "File Missing from S3"
+    FILE_EXTRA = "Extra File in S3"
 
 
 @dataclass
@@ -128,7 +141,7 @@ def validate_unique(
             errors.append(
                 create_error(
                     message=f"Missing column for unique check: '{col}'",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.MISSING_COLUMN.value,
                     column_name=col,
                     file_name=file_name,
                 )
@@ -144,7 +157,7 @@ def validate_unique(
                     survey_id=row.get(SURVEY_ID_COLUMN, ""),
                     drop_id=row.get(DROP_ID_COLUMN, ""),
                     message=f"Duplicate value in unique column '{col}'",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.DUPLICATE_VALUE.value,
                     column_name=col,
                     relevant_column_value=row[col],
                     file_name=file_name,
@@ -175,7 +188,7 @@ def validate_foreign_keys(
             errors.append(
                 create_error(
                     message=f"Foreign key check skipped: target dataset '{target_name}' not found",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.DATASET_LOAD_ERROR.value,
                     column_name=fk_col,
                     file_name=source_file,
                 )
@@ -187,7 +200,7 @@ def validate_foreign_keys(
             errors.append(
                 create_error(
                     message=f"Foreign key check skipped: target dataset '{target_name}' is empty",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.DATASET_LOAD_ERROR.value,
                     column_name=fk_col,
                     file_name=source_file,
                 )
@@ -198,7 +211,7 @@ def validate_foreign_keys(
             errors.append(
                 create_error(
                     message=f"Foreign key column '{fk_col}' not found",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.MISSING_COLUMN.value,
                     column_name=fk_col,
                     file_name=source_file,
                 )
@@ -216,7 +229,7 @@ def validate_foreign_keys(
                     survey_id=row.get(SURVEY_ID_COLUMN, ""),
                     drop_id=row.get(DROP_ID_COLUMN, ""),
                     message=f"Foreign key '{fk_col}' = '{row[fk_col]}' not found in '{fk_file_name}'",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.FOREIGN_KEY_NOT_FOUND.value,
                     column_name=fk_col,
                     relevant_column_value=row[fk_col],
                     file_name=source_file,
@@ -253,7 +266,7 @@ def validate_required(
                     survey_id=survey_id,
                     drop_id=drop_id,
                     message=f"Missing value in required column '{col}', help_info: {help_info}.",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.MISSING_REQUIRED_VALUE.value,
                     column_name=col,
                     relevant_column_value=help_info,
                     file_name=file_name,
@@ -268,19 +281,26 @@ def validate_formats(
     patterns: Dict[str, str],
     file_name: str,
 ) -> List[ErrorChecking]:
-    """Check format patterns for a single row."""
+    """Check format patterns for a single row.
+
+    Args:
+        row: DataFrame row to validate
+        rules: Validation rules containing 'formats' as a list of column names
+        patterns: Dict mapping column names to regex patterns
+        file_name: Name of the file being validated
+    """
     errors = []
-    format_rules = rules.get("formats", {})
+    format_columns = rules.get("formats", [])
     survey_id = row.get(SURVEY_ID_COLUMN, "")
     drop_id = row.get(DROP_ID_COLUMN, "")
 
-    for col, pattern_name in format_rules.items():
+    for col in format_columns:
         if col not in row.index:
             continue
         value = row[col]
         if pd.isna(value) or value == "":
             continue
-        pattern = patterns.get(pattern_name)
+        pattern = patterns.get(col)
         if not pattern:
             continue
         if not re.match(pattern, str(value)):
@@ -288,8 +308,8 @@ def validate_formats(
                 create_error(
                     survey_id=survey_id,
                     drop_id=drop_id,
-                    message=f"Value {value} does not match required format for {col}: expected pattern '{pattern}'",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    message=f"Value '{value}' does not match required format for {col}",
+                    error_source=ErrorSource.INVALID_FORMAT.value,
                     column_name=col,
                     relevant_column_value=value,
                     file_name=file_name,
@@ -331,7 +351,7 @@ def validate_values(
                         survey_id=survey_id,
                         drop_id=drop_id,
                         message=f"{col} value '{actual}' is not a valid number",
-                        error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                        error_source=ErrorSource.INVALID_VALUE.value,
                         column_name=col,
                         relevant_column_value=actual,
                         file_name=file_name,
@@ -344,7 +364,7 @@ def validate_values(
                         survey_id=survey_id,
                         drop_id=drop_id,
                         message=f"{col} value {actual_numeric} is outside valid range [{value_range[0]}, {value_range[1]}]",
-                        error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                        error_source=ErrorSource.VALUE_OUT_OF_RANGE.value,
                         column_name=col,
                         relevant_column_value=actual,
                         file_name=file_name,
@@ -392,7 +412,7 @@ def validate_relationships(
                         survey_id=survey_id,
                         drop_id=drop_id,
                         message=f"Missing column {col} for relationship template: {str(e)}",
-                        error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                        error_source=ErrorSource.MISSING_COLUMN.value,
                         column_name=col,
                         file_name=file_name,
                     )
@@ -404,14 +424,16 @@ def validate_relationships(
                     str(actual), str(expected)
                 ):
                     message = f"{REPLICATE_COLUMN} mismatch: {col} should end with '{str(expected)[-2:]}' but ends with '{str(actual)[-2:]}'. Full {col} should be '{expected}', but is '{actual}'"
+                    error_source = ErrorSource.REPLICATE_MISMATCH.value
                 else:
                     message = f"{col} should be '{expected}', but is '{actual}'"
+                    error_source = ErrorSource.RELATIONSHIP_MISMATCH.value
                 errors.append(
                     create_error(
                         survey_id=survey_id,
                         drop_id=drop_id,
                         message=message,
-                        error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                        error_source=error_source,
                         column_name=col,
                         relevant_column_value=actual,
                         file_name=file_name,
@@ -440,7 +462,7 @@ class FilePresenceValidator:
             parts = file_path.split("/")
             if len(parts) >= 3 and parts[0] == "media":
                 return parts[1] if parts[1] else None, parts[2] if parts[2] else None
-        except Exception as e:
+        except (IndexError, TypeError) as e:
             logging.warning(
                 f"Could not extract survey/drop ID from path '{file_path}': {e}"
             )
@@ -467,7 +489,7 @@ class FilePresenceValidator:
                         drop_id=drop_id,
                         message=f"File {file_path} not found in AWS, but found in {csv_filename}",
                         relevant_column_value=file_path,
-                        error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
+                        error_source=ErrorSource.FILE_MISSING.value,
                     )
                 )
 
@@ -481,7 +503,7 @@ class FilePresenceValidator:
                         drop_id=drop_id,
                         message=f"File {file_path} found in AWS but not in {csv_filename}",
                         relevant_column_value=file_path,
-                        error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
+                        error_source=ErrorSource.FILE_EXTRA.value,
                     )
                 )
         except Exception as e:
@@ -489,7 +511,7 @@ class FilePresenceValidator:
                 create_error(
                     message=f"File presence validation failed: {str(e)}",
                     file_name=csv_filename,
-                    error_source=ErrorSource.FILE_PRESENCE_CHECK.value,
+                    error_source=ErrorSource.DATASET_LOAD_ERROR.value,
                 )
             )
         return errors

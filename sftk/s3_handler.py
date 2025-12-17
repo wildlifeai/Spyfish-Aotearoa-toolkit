@@ -605,6 +605,8 @@ class S3Handler:
                                 # Delete the old object
                                 self.s3.delete_object(Bucket=self.bucket, Key=old_name)
                                 logging.info(f"✅ Renamed: {old_name} ➜ {new_name}")
+                            else:
+                                raise
 
                 except BotoCoreError as e:
                     logging.warning(

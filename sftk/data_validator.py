@@ -97,7 +97,7 @@ class DataValidator:
             except S3FileNotFoundError as e:
                 error = create_error(
                     message=f"Dataset '{dataset_name}' could not be downloaded from '{rule_set['file_name']}', error: {e}",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.DATASET_LOAD_ERROR.value,
                     file_name=dataset_name,
                 )
                 self.errors.append(error)
@@ -114,7 +114,7 @@ class DataValidator:
             if df.empty:
                 error = create_error(
                     message="Dataset could not be loaded.",
-                    error_source=ErrorSource.SHAREPOINT_VALIDATION.value,
+                    error_source=ErrorSource.DATASET_LOAD_ERROR.value,
                     file_name=file_name,
                 )
                 self.errors.append(error)
@@ -147,6 +147,12 @@ class DataValidator:
 
         # Execute validation on all datasets
         self._process_datasets()
+
+        if config.file_presence:
+            file_presence_errors = self.file_presence_validator.validate(
+                FILE_PRESENCE_RULES
+            )
+            self.errors.extend(file_presence_errors)
 
         # Export and return results
         self._export_errors_from_list_to_df(config.remove_duplicates)

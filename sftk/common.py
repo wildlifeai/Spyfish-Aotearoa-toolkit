@@ -199,6 +199,7 @@ VALIDATION_RULES = {
         "required": [SURVEY_ID_COLUMN],
         "unique": [SURVEY_ID_COLUMN],
         "info_columns": ["SurveyName"],
+        "formats": [SURVEY_ID_COLUMN],
         # TODO it flags the missing surveys in Deployments,
         # maybe ok even tho it technically isn't a foreign key
         "foreign_keys": {
@@ -211,6 +212,7 @@ VALIDATION_RULES = {
         "required": [SITE_ID_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
         "unique": [SITE_ID_COLUMN],
         "info_columns": [SITE_NAME_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "formats": [SITE_ID_COLUMN],
         "foreign_keys": {},
         "relationships": [],
     },
