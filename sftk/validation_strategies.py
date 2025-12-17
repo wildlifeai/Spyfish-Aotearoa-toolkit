@@ -142,17 +142,6 @@ def validate_unique(
     unique_cols = rules.get("unique", [])
 
     for col in unique_cols:
-        if col not in df.columns:
-            errors.append(
-                create_error(
-                    message=f"Missing column for unique check: '{col}'",
-                    error_source=ErrorSource.MISSING_COLUMN.value,
-                    column_name=col,
-                    file_name=file_name,
-                )
-            )
-            continue
-
         duplicated = df[df[col].duplicated(keep=False) & df[col].notna()]
         for idx, row in duplicated.iterrows():
             if len(errors) >= max_errors:
@@ -271,9 +260,6 @@ def validate_required(
     info_columns = rules.get("info_columns", [])
 
     for col in required_cols:
-        if col not in df.columns:
-            continue
-
         # Vectorized: find rows with missing values (NA, empty string, or None)
         is_missing = df[col].isna() | (df[col] == "")
         missing_rows = df[is_missing]
@@ -310,22 +296,11 @@ def validate_formats(
     tracker: Optional[CleanRowTracker] = None,
     dataset_name: Optional[str] = None,
 ) -> List[ErrorChecking]:
-    """Check format patterns (vectorized).
-
-    Args:
-        df: DataFrame to validate
-        rules: Validation rules containing 'formats' as a list of column names
-        patterns: Dict mapping column names to regex patterns
-        file_name: Name of the file being validated
-        tracker: Optional CleanRowTracker for tracking error rows
-        dataset_name: Name of the dataset being validated
-    """
+    """Check format patterns (vectorized)."""
     errors = []
     format_columns = rules.get("formats", [])
 
     for col in format_columns:
-        if col not in df.columns:
-            continue
         pattern = patterns.get(col)
         if not pattern:
             continue
@@ -373,9 +348,6 @@ def validate_values(
 
     for value_rule in value_rules:
         col = value_rule["column"]
-        if col not in df.columns:
-            continue
-
         rule = value_rule["rule"]
         if rule != "value_range":
             continue
@@ -441,9 +413,6 @@ def validate_relationships(
 
     for relationship in relationships:
         col = relationship["column"]
-        if col not in df.columns:
-            continue
-
         rule = relationship["rule"]
         if rule != "equals":
             continue
@@ -648,12 +617,14 @@ class DatasetValidator:
 
     def validate(self, df: pd.DataFrame, dataset_name: str) -> List[ErrorChecking]:
         """Validate the dataset with all rules (vectorized)."""
+        # Check for missing columns first - stop if any are missing
+        missing_col_errors = self._check_missing_columns(df)
+        if missing_col_errors:
+            return missing_col_errors
+
         errors = []
 
-        # Check for missing required columns (once per dataset)
-        errors.extend(self._check_missing_columns(df))
-
-        # Dataset-level validations (already vectorized)
+        # Dataset-level validations
         errors.extend(validate_unique(df, self.rules, self.tracker, dataset_name))
         errors.extend(
             validate_foreign_keys(
@@ -661,7 +632,7 @@ class DatasetValidator:
             )
         )
 
-        # Vectorized validations (no longer row-by-row)
+        # Vectorized validations
         errors.extend(
             validate_required(
                 df, self.rules, self.file_name, self.tracker, dataset_name
@@ -689,28 +660,31 @@ class DatasetValidator:
         return errors
 
     def _check_missing_columns(self, df: pd.DataFrame) -> List[ErrorChecking]:
-        """Check if required or format columns are missing from the dataframe."""
+        """Check if all columns needed for validation exist in the dataframe.
+
+        Consolidates column existence checks for: required, formats, unique,
+        values, and relationships validations. Foreign key column checks are
+        handled separately in validate_foreign_keys due to cross-dataset logic.
+        """
         errors = []
         df_columns = set(df.columns)
 
-        # Check required columns
-        for col in self.rules.get("required", []):
-            if col not in df_columns:
-                errors.append(
-                    create_error(
-                        message=f"Required column '{col}' not found in dataset",
-                        error_source=ErrorSource.MISSING_COLUMN.value,
-                        column_name=col,
-                        file_name=self.file_name,
-                    )
-                )
+        # Collect all columns that need to exist
+        columns_to_check = []
+        columns_to_check.extend(self.rules.get("required", []))
+        columns_to_check.extend(self.rules.get("formats", []))
+        columns_to_check.extend(self.rules.get("unique", []))
+        for value_rule in self.rules.get("values", []):
+            columns_to_check.append(value_rule["column"])
+        for relationship in self.rules.get("relationships", []):
+            columns_to_check.append(relationship["column"])
 
-        # Check format columns
-        for col in self.rules.get("formats", []):
+        # Check each unique column
+        for col in set(columns_to_check):
             if col not in df_columns:
                 errors.append(
                     create_error(
-                        message=f"Format column '{col}' not found in dataset",
+                        message=f"Column '{col}' not found in dataset",
                         error_source=ErrorSource.MISSING_COLUMN.value,
                         column_name=col,
                         file_name=self.file_name,

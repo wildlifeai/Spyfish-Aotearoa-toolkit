@@ -17,7 +17,9 @@ from sftk.common import (
     EXPORT_LOCAL,
     FILE_PRESENCE_RULES,
     LOCAL_DATA_FOLDER_PATH,
-    S3_SPYFISH_METADATA,
+    S3_ERRORS_CSV,
+    S3_EXTRA_FILES,
+    S3_MISSING_FILES,
     VALIDATION_PATTERNS,
     VALIDATION_RULES,
 )
@@ -55,10 +57,8 @@ class DataValidator:
         self.validation_rules = self._get_validation_rules()
         self.clean_row_tracker = None
         self.file_presence_validator = FilePresenceValidator(self.s3_handler)
-        if EXPORT_LOCAL:
-            self.FOLDER_PATH = LOCAL_DATA_FOLDER_PATH
-        else:
-            self.FOLDER_PATH = S3_SPYFISH_METADATA
+        # Local folder path for exports (only used when EXPORT_LOCAL=True)
+        self.local_folder_path = LOCAL_DATA_FOLDER_PATH
 
     def run_validation(
         self,
@@ -209,7 +209,7 @@ class DataValidator:
             subset=key_cols, ignore_index=True
         )
 
-    def export_to_csv(self, csv_file_name="validation_errors_cleaned.csv"):
+    def export_to_csv(self, local_file_name: str = "validation_errors.csv"):
         """
         Export validation errors to a CSV file or S3 bucket.
 
@@ -217,8 +217,8 @@ class DataValidator:
         The CSV will contain all validation errors with their associated metadata.
 
         Args:
-            csv_file_name (str, optional): Name of the output CSV file.
-                Defaults to "validation_errors_cleaned.csv".
+            local_file_name (str, optional): Name of the output CSV file for local export.
+                Defaults to "validation_errors.csv". Ignored for S3 (uses S3_ERRORS_CSV).
 
         Side Effects:
             - Creates a CSV file with the specified name
@@ -228,31 +228,26 @@ class DataValidator:
             The CSV is exported without the DataFrame index to keep the
             output clean and focused on the error data.
         """
-
         if EXPORT_LOCAL:
-            path = Path(self.FOLDER_PATH) / csv_file_name
+            path = Path(self.local_folder_path) / local_file_name
             path.parent.mkdir(parents=True, exist_ok=True)
-
             self.errors_df.to_csv(path, index=False)
             logging.info(f"Errors exported locally to csv file {path}.")
         else:
             self.s3_handler.upload_updated_df_to_s3(
                 df=self.errors_df,
-                key=self.FOLDER_PATH,
-                filename=csv_file_name,
+                key=S3_ERRORS_CSV,
+                filename="errors_temp.csv",
                 keep_df_index=False,
             )
-            logging.info(
-                f"Errors exported to S3 csv file {self.FOLDER_PATH}/{csv_file_name}."
-            )
+            logging.info(f"Errors exported to S3: {S3_ERRORS_CSV}")
 
     def export_clean_dataframes_to_csv(self) -> None:
         """
-        Export all clean dataframes to CSV files.
+        Export all clean dataframes to CSV files (local only for now).
 
         Exports each clean dataframe (rows with no validation errors) to separate
-        CSV files. Files are named with the pattern "clean_{dataset_name}.csv"
-        and exported to self.FOLDER_PATH (local or S3 depending on EXPORT_LOCAL).
+        CSV files. Files are named with the pattern "clean_{dataset_name}.csv".
 
         Raises:
             ValueError: If no clean dataframes are available (clean row tracking not enabled)
@@ -262,6 +257,13 @@ class DataValidator:
             - CSV files are exported without DataFrame index
             - Empty dataframes are skipped
         """
+        # TODO: Add S3 export for clean dataframes (will go to kso folder eventually)
+        if not EXPORT_LOCAL:
+            logging.warning(
+                "Clean dataframe export to S3 not yet implemented. Skipping."
+            )
+            return
+
         if not self.clean_row_tracker:
             raise ValueError(
                 "Clean dataframes not available. Enable extract_clean_dataframes "
@@ -279,34 +281,29 @@ class DataValidator:
                 continue
 
             current_filename = f"clean_{dataset_name}.csv"
-
-            if EXPORT_LOCAL:
-                output_path = os.path.join(self.FOLDER_PATH, current_filename)
-                path = Path(output_path)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                clean_df.to_csv(output_path, index=False)
-                logging.info(
-                    f"Clean {dataset_name} dataframe exported to {output_path}"
-                )
-            else:
-                self.s3_handler.upload_updated_df_to_s3(
-                    df=clean_df,
-                    key=self.FOLDER_PATH,
-                    filename=current_filename,
-                    keep_df_index=False,
-                )
+            output_path = os.path.join(self.local_folder_path, current_filename)
+            path = Path(output_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            clean_df.to_csv(output_path, index=False)
+            logging.info(f"Clean {dataset_name} dataframe exported to {output_path}")
 
         logging.info(
-            f"Exported {len(clean_dataframes)} clean dataframes to {self.FOLDER_PATH}"
+            f"Exported {len(clean_dataframes)} clean dataframes to {self.local_folder_path}"
         )
 
     def export_file_differences(
         self,
-        missing_file_name: str = "missing_files_in_aws.txt",
-        extra_file_name: str = "extra_files_in_aws.txt",
+        local_missing_file_name: str = "missing_files_in_aws.txt",
+        local_extra_file_name: str = "extra_files_in_aws.txt",
         file_presence_rules: Dict[str, Any] = FILE_PRESENCE_RULES,
     ) -> tuple:
-        """Export file differences to separate text files."""
+        """Export file differences to separate text files.
+
+        Args:
+            local_missing_file_name: Local file name for missing files. Ignored for S3.
+            local_extra_file_name: Local file name for extra files. Ignored for S3.
+            file_presence_rules: Rules defining which files to check.
+        """
         try:
             all_files_set, missing_files_set, extra_files_set = (
                 self.file_presence_validator.get_file_differences(file_presence_rules)
@@ -314,17 +311,16 @@ class DataValidator:
             missing_files_data = "\n".join(sorted(missing_files_set))
             extra_files_data = "\n".join(sorted(extra_files_set))
 
-            missing_files_path = os.path.join(self.FOLDER_PATH, missing_file_name)
-            extra_files_path = os.path.join(self.FOLDER_PATH, extra_file_name)
-
             if EXPORT_LOCAL:
-                write_data_to_file(missing_files_data, missing_files_path)
-                write_data_to_file(extra_files_data, extra_files_path)
-            else:
-                self.s3_handler.upload_data_to_s3(
-                    missing_files_data, missing_files_path
+                missing_path = os.path.join(
+                    self.local_folder_path, local_missing_file_name
                 )
-                self.s3_handler.upload_data_to_s3(extra_files_data, extra_files_path)
+                extra_path = os.path.join(self.local_folder_path, local_extra_file_name)
+                write_data_to_file(missing_files_data, missing_path)
+                write_data_to_file(extra_files_data, extra_path)
+            else:
+                self.s3_handler.upload_data_to_s3(missing_files_data, S3_MISSING_FILES)
+                self.s3_handler.upload_data_to_s3(extra_files_data, S3_EXTRA_FILES)
 
             logging.info(
                 f"File differences exported: {len(missing_files_set)} missing, {len(extra_files_set)} extra"

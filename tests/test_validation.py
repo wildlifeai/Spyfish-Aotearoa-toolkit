@@ -233,7 +233,7 @@ class TestComprehensiveValidation:
         ), f"Expected 2 clean rows, got {len(clean_indices)}"
 
     def test_missing_columns(self):
-        """DatasetValidator should report missing required and format columns."""
+        """DatasetValidator should report missing columns once (deduplicated)."""
         df = pd.DataFrame({"SurveyID": ["AKA_20231215_BUV"]})  # Missing DropID column
 
         rules = {
@@ -248,10 +248,10 @@ class TestComprehensiveValidation:
         missing_col_errors = [
             e for e in errors if e.ErrorType == ErrorSource.MISSING_COLUMN.value
         ]
-        assert len(missing_col_errors) == 2  # One for required, one for format
-        assert all(e.ColumnName == "DropID" for e in missing_col_errors)
-        assert any("Required column" in e.ErrorMessage for e in missing_col_errors)
-        assert any("Format column" in e.ErrorMessage for e in missing_col_errors)
+        # Missing column reported once (deduplicated across required/formats/etc)
+        assert len(missing_col_errors) == 1
+        assert missing_col_errors[0].ColumnName == "DropID"
+        assert "not found in dataset" in missing_col_errors[0].ErrorMessage
 
     def test_file_presence_validation(self):
         """FilePresenceValidator should find missing and extra files."""
@@ -359,12 +359,9 @@ class TestDataValidator:
                 with tempfile.TemporaryDirectory() as temp_dir:
                     with patch("sftk.data_validator.LOCAL_DATA_FOLDER_PATH", temp_dir):
                         validator = DataValidator()
-                        validator.FOLDER_PATH = temp_dir
 
                         validator.run_validation(file_presence=False)
 
                         assert validator.errors_df is not None
-                        csv_path = os.path.join(
-                            temp_dir, "validation_errors_cleaned.csv"
-                        )
+                        csv_path = os.path.join(temp_dir, "validation_errors.csv")
                         assert os.path.exists(csv_path)
