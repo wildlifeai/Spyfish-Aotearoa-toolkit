@@ -207,10 +207,21 @@ def validate_foreign_keys(
             )
             continue
 
-        if fk_col not in df.columns or fk_col not in target_df.columns:
+        if fk_col not in df.columns:
             errors.append(
                 create_error(
-                    message=f"Foreign key column '{fk_col}' not found",
+                    message=f"Foreign key column '{fk_col}' not found in source file '{source_file}'",
+                    error_source=ErrorSource.MISSING_COLUMN.value,
+                    column_name=fk_col,
+                    file_name=source_file,
+                )
+            )
+            continue
+
+        if fk_col not in target_df.columns:
+            errors.append(
+                create_error(
+                    message=f"Foreign key column '{fk_col}' not found in target dataset '{target_name}'",
                     error_source=ErrorSource.MISSING_COLUMN.value,
                     column_name=fk_col,
                     file_name=source_file,
