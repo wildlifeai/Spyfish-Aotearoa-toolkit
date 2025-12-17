@@ -178,6 +178,21 @@ VALIDATION_RULES = {
                 "allow_null": True,
             },
         ],
+        "values": [
+            # TODO the Lat and Long ranges are approximate,correct area
+            {
+                "column": "Latitude",
+                "rule": "value_range",
+                "range": [-46, -36],
+                "allowed_values": [0],
+            },
+            {
+                "column": "Longitude",
+                "rule": "value_range",
+                "range": [170, 178.5],
+                "allowed_values": [0],
+            },
+        ],
     },
     "surveys": {
         "file_name": S3_SHAREPOINT_SURVEY_CSV,
@@ -193,8 +208,8 @@ VALIDATION_RULES = {
     },
     "sites": {
         "file_name": S3_SHAREPOINT_SITE_CSV,
-        "required": [SITE_ID_COLUMN],
-        "unique": [SITE_ID_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "required": [SITE_ID_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
+        "unique": [SITE_ID_COLUMN],
         "info_columns": [SITE_NAME_COLUMN, LINK_TO_MARINE_RESERVE_COLUMN],
         "foreign_keys": {},
         "relationships": [],
@@ -229,10 +244,10 @@ FILE_PRESENCE_RULES = {
         "s3_sharepoint_path": S3_SHAREPOINT_PATH,
         "csv_filename": "BUV Deployment.csv",
         "csv_column_to_extract": "LinkToVideoFile",
-        "column_filter": "IsBadDeployment",
-        "column_value": False,
-        # "column_filter": None,
-        # "column_value": None,
+        # "column_filter": "IsBadDeployment",
+        # "column_value": False,
+        "column_filter": None,
+        "column_value": None,
         "valid_extensions": MOVIE_EXTENSIONS,
         "path_prefix": "media",
     }
