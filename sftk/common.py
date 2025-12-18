@@ -98,10 +98,23 @@ S3_KSO_SPECIES_CSV = os.path.join(S3_KSO_PATH, "species_buv_doc.csv")
 S3_KSO_SURVEY_CSV = os.path.join(S3_KSO_PATH, "surveys_buv_doc.csv")
 S3_KSO_TEST_CSV = os.path.join(S3_KSO_PATH, "test_buv_doc.csv")
 
-# Validation output files
-S3_ERRORS_CSV = os.path.join(S3_SPYFISH_METADATA, "errors_buv_doc.csv")
-S3_MISSING_FILES = os.path.join(S3_SPYFISH_METADATA, "missing_files_in_aws.txt")
-S3_EXTRA_FILES = os.path.join(S3_SPYFISH_METADATA, "extra_files_in_aws.txt")
+
+# Status board output files
+S3_STATUS_PATH = os.path.join(S3_SPYFISH_METADATA, "status")
+
+# Filenames (shared between local and S3)
+DEPLOYMENT_STATUS_FILENAME = "deployments_status.csv"
+SURVEY_STATUS_FILENAME = "surveys_status.csv"
+ERRORS_FILENAME = "data_errors.csv"
+MISSING_FILES_FILENAME = "missing_files_in_aws.txt"
+EXTRA_FILES_FILENAME = "extra_files_in_aws.txt"
+
+# S3 paths
+S3_DEPLOYMENT_STATUS_CSV = os.path.join(S3_STATUS_PATH, DEPLOYMENT_STATUS_FILENAME)
+S3_SURVEY_STATUS_CSV = os.path.join(S3_STATUS_PATH, SURVEY_STATUS_FILENAME)
+S3_ERRORS_CSV = os.path.join(S3_STATUS_PATH, ERRORS_FILENAME)
+S3_MISSING_FILES = os.path.join(S3_STATUS_PATH, MISSING_FILES_FILENAME)
+S3_EXTRA_FILES = os.path.join(S3_STATUS_PATH, EXTRA_FILES_FILENAME)
 
 
 # Specific Column names used in Sharepoint

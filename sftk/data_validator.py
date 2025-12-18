@@ -14,9 +14,12 @@ from typing import Any, Dict
 import pandas as pd
 
 from sftk.common import (
+    ERRORS_FILENAME,
     EXPORT_LOCAL,
+    EXTRA_FILES_FILENAME,
     FILE_PRESENCE_RULES,
     LOCAL_DATA_FOLDER_PATH,
+    MISSING_FILES_FILENAME,
     S3_ERRORS_CSV,
     S3_EXTRA_FILES,
     S3_MISSING_FILES,
@@ -59,6 +62,8 @@ class DataValidator:
         self.file_presence_validator = FilePresenceValidator(self.s3_handler)
         # Local folder path for exports (only used when EXPORT_LOCAL=True)
         self.local_folder_path = LOCAL_DATA_FOLDER_PATH
+        # Cache for file differences (to avoid duplicate S3 calls)
+        self._file_differences_cache = None
 
     def run_validation(
         self,
@@ -209,16 +214,12 @@ class DataValidator:
             subset=key_cols, ignore_index=True
         )
 
-    def export_to_csv(self, local_file_name: str = "validation_errors.csv"):
+    def export_to_csv(self):
         """
         Export validation errors to a CSV file or S3 bucket.
 
         Saves the errors DataFrame to a CSV file for analysis and reporting.
         The CSV will contain all validation errors with their associated metadata.
-
-        Args:
-            local_file_name (str, optional): Name of the output CSV file for local export.
-                Defaults to "validation_errors.csv". Ignored for S3 (uses S3_ERRORS_CSV).
 
         Side Effects:
             - Creates a CSV file with the specified name
@@ -229,7 +230,7 @@ class DataValidator:
             output clean and focused on the error data.
         """
         if EXPORT_LOCAL:
-            path = Path(self.local_folder_path) / local_file_name
+            path = Path(self.local_folder_path) / ERRORS_FILENAME
             path.parent.mkdir(parents=True, exist_ok=True)
             self.errors_df.to_csv(path, index=False)
             logging.info(f"Errors exported locally to csv file {path}.")
@@ -237,7 +238,7 @@ class DataValidator:
             self.s3_handler.upload_updated_df_to_s3(
                 df=self.errors_df,
                 key=S3_ERRORS_CSV,
-                filename="errors_temp.csv",
+                filename=ERRORS_FILENAME,
                 keep_df_index=False,
             )
             logging.info(f"Errors exported to S3: {S3_ERRORS_CSV}")
@@ -291,31 +292,50 @@ class DataValidator:
             f"Exported {len(clean_dataframes)} clean dataframes to {self.local_folder_path}"
         )
 
+    def get_file_differences(
+        self,
+        file_presence_rules: Dict[str, Any] = FILE_PRESENCE_RULES,
+    ) -> tuple:
+        """Get file differences, using cache if available.
+
+        Args:
+            file_presence_rules: Rules defining which files to check.
+
+        Returns:
+            tuple: (all_files_set, missing_files_set, extra_files_set)
+        """
+        if self._file_differences_cache is None:
+            self._file_differences_cache = (
+                self.file_presence_validator.get_file_differences(file_presence_rules)
+            )
+        return self._file_differences_cache
+
     def export_file_differences(
         self,
-        local_missing_file_name: str = "missing_files_in_aws.txt",
-        local_extra_file_name: str = "extra_files_in_aws.txt",
         file_presence_rules: Dict[str, Any] = FILE_PRESENCE_RULES,
     ) -> tuple:
         """Export file differences to separate text files.
 
+        Uses cached file differences if available to avoid duplicate S3 calls.
+
         Args:
-            local_missing_file_name: Local file name for missing files. Ignored for S3.
-            local_extra_file_name: Local file name for extra files. Ignored for S3.
             file_presence_rules: Rules defining which files to check.
+
+        Returns:
+            tuple: (all_files_set, missing_files_set, extra_files_set)
         """
         try:
             all_files_set, missing_files_set, extra_files_set = (
-                self.file_presence_validator.get_file_differences(file_presence_rules)
+                self.get_file_differences(file_presence_rules)
             )
             missing_files_data = "\n".join(sorted(missing_files_set))
             extra_files_data = "\n".join(sorted(extra_files_set))
 
             if EXPORT_LOCAL:
                 missing_path = os.path.join(
-                    self.local_folder_path, local_missing_file_name
+                    self.local_folder_path, MISSING_FILES_FILENAME
                 )
-                extra_path = os.path.join(self.local_folder_path, local_extra_file_name)
+                extra_path = os.path.join(self.local_folder_path, EXTRA_FILES_FILENAME)
                 write_data_to_file(missing_files_data, missing_path)
                 write_data_to_file(extra_files_data, extra_path)
             else:
