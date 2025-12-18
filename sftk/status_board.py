@@ -190,7 +190,7 @@ class StatusBoard:
         - NeedsAction: True if any deployment needs action (or 0 deployments)
         """
         # Group by SurveyID and aggregate using deployment status columns
-        survey_summary = (
+        survey_summary_agg = (
             deployment_status_df.groupby("SurveyID")
             .agg(
                 TotalDeployments=("DropID", "nunique"),
@@ -206,13 +206,11 @@ class StatusBoard:
             .reset_index()
         )
 
-        # Include surveys with no deployments
-        all_survey_ids = surveys_df["SurveyID"].unique()
-        missing_surveys = set(all_survey_ids) - set(survey_summary["SurveyID"])
-        if missing_surveys:
-            empty_rows = pd.DataFrame({"SurveyID": list(missing_surveys)})
-            survey_summary = pd.concat([survey_summary, empty_rows], ignore_index=True)
-            survey_summary = survey_summary.fillna(0)
+        # Include surveys with no deployments by merging with the full survey list
+        all_surveys_df = surveys_df[["SurveyID"]].drop_duplicates()
+        survey_summary = pd.merge(
+            all_surveys_df, survey_summary_agg, on="SurveyID", how="left"
+        ).fillna(0)
 
         # CompleteDeployments = Total - Incomplete
         survey_summary["CompleteDeployments"] = (
