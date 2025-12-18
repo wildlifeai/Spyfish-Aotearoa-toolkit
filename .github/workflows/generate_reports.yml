@@ -1,4 +1,4 @@
-name: Validate data and export error report into S3 bucket
+name: Generate error and status reports
 
 on:
   workflow_dispatch: # Allows manual triggering
@@ -26,9 +26,9 @@ jobs:
         pip install -r requirements.txt
         pip install .
 
-    - name: Run error checking script
+    - name: Generate error and status reports
       run: |
-        python metadata_management/validate_data.py
+        python metadata_management/generate_reports.py
       env:
         S3_BUCKET: ${{ secrets.S3_BUCKET }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

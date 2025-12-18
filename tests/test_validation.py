@@ -349,6 +349,7 @@ class TestDataValidator:
         import os
         import tempfile
 
+        from sftk.common import ERRORS_FILENAME
         from sftk.data_validator import DataValidator
 
         test_df = pd.DataFrame({"name": ["Alice", None, "Bob"], "id": [1, 2, 3]})
@@ -363,5 +364,5 @@ class TestDataValidator:
                         validator.run_validation(file_presence=False)
 
                         assert validator.errors_df is not None
-                        csv_path = os.path.join(temp_dir, "validation_errors.csv")
+                        csv_path = os.path.join(temp_dir, ERRORS_FILENAME)
                         assert os.path.exists(csv_path)
