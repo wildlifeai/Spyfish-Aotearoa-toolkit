@@ -225,32 +225,21 @@ class StatusBoard:
         )
 
         # Calculate percentages (handle division by zero for surveys with no deployments)
-        survey_summary["CompletionPct"] = survey_summary.apply(
-            lambda r: (
-                0.0
-                if r["TotalDeployments"] == 0
-                else round(r["CompleteDeployments"] / r["TotalDeployments"] * 100, 1)
-            ),
-            axis=1,
-        )
-
-        survey_summary["AnnotationPct"] = survey_summary.apply(
-            lambda r: (
-                0.0
-                if r["TotalDeployments"] == 0
-                else round(r["AnnotatedDeployments"] / r["TotalDeployments"] * 100, 1)
-            ),
-            axis=1,
-        )
-
-        survey_summary["BadDeploymentPct"] = survey_summary.apply(
-            lambda r: (
-                0.0
-                if r["TotalDeployments"] == 0
-                else round(r["BadDeployments"] / r["TotalDeployments"] * 100, 1)
-            ),
-            axis=1,
-        )
+        total_deployments = survey_summary["TotalDeployments"]
+        for numerator_col, pct_col in [
+            ("CompleteDeployments", "CompletionPct"),
+            ("AnnotatedDeployments", "AnnotationPct"),
+            ("BadDeployments", "BadDeploymentPct"),
+        ]:
+            # Vectorized calculation is more performant than apply.
+            # Division by zero results in inf/nan, which we can clean up.
+            pct = survey_summary[numerator_col] / total_deployments * 100
+            # Replace inf/-inf with nan, then fill all nan with 0, then round.
+            survey_summary[pct_col] = (
+                pct.replace([float("inf"), -float("inf")], float("nan"))
+                .fillna(0)
+                .round(1)
+            )
 
         # NeedsAction: True if not 100% complete (includes surveys with 0 deployments)
         survey_summary["NeedsAction"] = survey_summary["CompletionPct"] < 100
