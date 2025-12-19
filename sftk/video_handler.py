@@ -23,47 +23,43 @@ def _extract_gopro_sequence_id(
     filename: str, gopro_prefix: str = "GX"
 ) -> Optional[str]:
     """
-    Extract the sequence ID from a GoPro or Orau filename.
+    Extract the sequence ID from a filename. Files with _1, _2, etc. are parts
+    of the SAME sequence and should be grouped together.
 
     Supports multiple naming patterns:
-        Standard GoPro:
+        Underscore format (primary):
+        - S2-2 14012022_1.MP4 -> "S2-2 14012022" (parts 1,2,etc. belong together)
+        - S2-1 14012022_2.MP4 -> "S2-1 14012022" (parts 1,2,etc. belong together)
+        - TUK_1.MP4 -> "TUK" (parts 1,2,etc. belong together)
+
+        Standard GoPro (fallback):
         - GOPR0298.MP4 -> "0298"
         - GP010298.MP4 -> "0298"
-        - GP020392.MP4 -> "0392"
         - GX010425.MP4 -> "0425"
-        - GH010298.MP4 -> "0298"
-        - GL010298.MP4 -> "0298"
-
-        Other format:
-        - Orau_NR_E1_1A.MP4 -> "1"
-        - Orau_NR_E1_1B.MP4 -> "1"
-        - Orau_NR_E1_1C.MP4 -> "1"
-        - Orau_NR_E1_2A.MP4 -> "2"
 
     Args:
         filename: The filename to parse
-        gopro_prefix: The prefix to look for (e.g., "GX", "Orau_")
+        gopro_prefix: The prefix to look for (e.g., "TUK", "Orau_", "GX")
 
     Returns:
-        The sequence ID, or None if not a valid format
+        The sequence ID (base name without part number), or None if not a valid format
     """
-    # Handle Orau_ format
-    if gopro_prefix == "Orau_":
-        # Pattern: Orau_*_*_<number><letter>.MP4
-        # Extract just the numeric part before the letter suffix
-        pattern = r"^Orau_.*_(\d+)[A-Z]\.MP4$"
-        match = re.match(pattern, filename, re.IGNORECASE)
-        if match:
-            return match.group(1)  # Return just the number (e.g., "1" from "1A")
-        return None
-
-    # Handle standard GoPro format
-    # Match GoPro pattern: GOPR or G[A-Z][0-9][0-9] followed by 4 digits
-    pattern = rf"^(GOPR|G[A-Z]\d{{2}})(\d{{4}})\.MP4$"
+    # Primary pattern: Extract everything BEFORE _<number>.MP4
+    # This groups files with _1, _2, _3 etc. as the same sequence
+    pattern = r"^(.+)_(\d+)\.MP4$"
     match = re.match(pattern, filename, re.IGNORECASE)
-
     if match:
-        return match.group(2)  # Return the 4-digit sequence ID
+        # Return the base name without the part number
+        # e.g., "S2-2 14012022_1.MP4" -> "S2-2 14012022"
+        return match.group(1)
+    
+    # Fallback to standard GoPro format if underscore pattern not found
+    # Match GoPro pattern: GOPR or G[A-Z][0-9][0-9] followed by 4 digits
+    gopro_pattern = rf"^(GOPR|G[A-Z]\d{{2}})(\d{{4}})\.MP4$"
+    gopro_match = re.match(gopro_pattern, filename, re.IGNORECASE)
+    if gopro_match:
+        return gopro_match.group(2)  # Return the 4-digit sequence ID
+    
     return None
 
 

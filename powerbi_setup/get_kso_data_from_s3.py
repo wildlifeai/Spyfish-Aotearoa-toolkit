@@ -1,9 +1,10 @@
 import os
 import logging
-from typing import Dict
+from typing import Dict, List
 import boto3
 from dotenv import load_dotenv
 import pandas as pd
+import re
 
 
 # S3 configuration
@@ -50,6 +51,65 @@ def create_s3_client(access_key, secret_key):
         raise ValueError("Unable to create S3 client. Check AWS credentials.")
 
 
+def list_csv_files_in_prefix(client, bucket, prefix):
+    """
+    List all CSV files in a given S3 prefix.
+
+    Args:
+        client (boto3.client): S3 client
+        bucket (str): S3 bucket name
+        prefix (str): S3 prefix path
+
+    Returns:
+        List[str]: List of CSV file keys
+    """
+    try:
+        csv_files = []
+        paginator = client.get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+        
+        for page in pages:
+            if 'Contents' in page:
+                for obj in page['Contents']:
+                    key = obj['Key']
+                    if key.endswith('.csv'):
+                        csv_files.append(key)
+        
+        logging.info(f"Found {len(csv_files)} CSV files in prefix '{prefix}'")
+        return csv_files
+    
+    except Exception as e:
+        logging.error(f"Failed to list CSV files in prefix '{prefix}': {e}")
+        raise
+
+
+def sanitize_dataframe_name(file_key):
+    """
+    Convert S3 file key to a PowerBI-friendly dataframe name.
+    
+    Args:
+        file_key (str): S3 file key (e.g., 'spyfish_metadata/status/file_name.csv')
+    
+    Returns:
+        str: Sanitized name suitable for PowerBI (e.g., 'status_file_name')
+    """
+    # Get the filename without extension
+    filename = os.path.splitext(os.path.basename(file_key))[0]
+    
+    # Get the parent directory name
+    parent_dir = os.path.basename(os.path.dirname(file_key))
+    
+    # Combine parent directory and filename
+    # Replace any non-alphanumeric characters with underscores
+    combined_name = f"{parent_dir}_{filename}"
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', combined_name)
+    
+    # Remove consecutive underscores and trailing/leading underscores
+    sanitized = re.sub(r'_+', '_', sanitized).strip('_')
+    
+    return sanitized
+
+
 def read_csv_from_s3(client, bucket, key):
     """
     Read a CSV file from S3 and return as a pandas DataFrame.
@@ -71,69 +131,18 @@ def read_csv_from_s3(client, bucket, key):
         raise IOError(f"Could not download or read file {key}")
 
 
-def process_annotations_dataframe(dataframes: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """
-    Process annotations dataframe with comprehensive error handling and logging.
-
-    Args:
-        dataframes (Dict[str, pd.DataFrame]): Dictionary of dataframes
-
-    Returns:
-        pd.DataFrame: Processed annotations dataframe
-    """
-    try:
-        # Calculate the max count per movie, annotator and species
-        max_count_df = (
-            dataframes["annotations"]
-            .groupby(["DropID", "annotatedBy", "scientificName"], as_index=False)[
-                "maxinterval"
-            ]
-            .max()
-        )
-
-        # Create a DataFrame with all possible combinations
-        all_combinations = pd.MultiIndex.from_product(
-            [
-                max_count_df["DropID"].unique(),
-                max_count_df["annotatedBy"].unique(),
-                max_count_df["scientificName"].unique(),
-            ],
-            names=["DropID", "annotatedBy", "scientificName"],
-        )
-        all_combinations_df = pd.DataFrame(index=all_combinations).reset_index()
-
-        # Merge the original DataFrame with all combinations
-        comb_max_count_df = all_combinations_df.merge(
-            max_count_df, how="left", on=["DropID", "annotatedBy", "scientificName"]
-        )
-
-        # Comprehensive merge with additional error handling
-        annotations_df = (
-            comb_max_count_df.merge(dataframes["movies"], on="DropID", how="left")
-            .merge(dataframes["sites"], on="SiteID", how="left")
-            .merge(dataframes["surveys"], on="SurveyID", how="left")
-            .merge(dataframes["species"], on="scientificName", how="left")
-        )
-
-        return annotations_df
-    except Exception as e:
-        logging.error(f"Failed to process annotations dataframe: {e}")
-        raise
-
-
 def main(env_path=None):
     """
     Main function to orchestrate S3 file download and processing.
+    Dynamically loads all CSV files from specified S3 prefixes.
+    
+    Returns:
+        Dict[str, pd.DataFrame]: Dictionary of dataframes keyed by sanitized names
     """
-    # CSV file keys
-    csv_keys = {
-        "annotations": "spyfish_metadata/kso_csvs/annotations_buv_doc.csv",
-        "movies": "spyfish_metadata/kso_csvs/movies_buv_doc.csv",
-        "sites": "spyfish_metadata/kso_csvs/sites_buv_doc.csv",
-        "surveys": "spyfish_metadata/kso_csvs/surveys_buv_doc.csv",
-        "species": "spyfish_metadata/kso_csvs/species_buv_doc.csv",
-        "errors": "spyfish_metadata/kso_csvs/errors_buv_doc.csv",
-    }
+    # S3 prefixes to scan for CSV files
+    csv_prefixes = [
+        "spyfish_metadata/status/",
+    ]
 
     # Load AWS credentials and create S3 client
     try:
@@ -150,49 +159,31 @@ def main(env_path=None):
         logging.error(f"S3 client creation failed: {client_error}")
         raise
 
-    # Read CSV files from S3 and store in a dictionary of DataFrames
-    dataframes = {}
-    for name, key in csv_keys.items():
+    # Discover all CSV files in the specified prefixes
+    all_csv_files = []
+    for prefix in csv_prefixes:
         try:
-            logging.info(f"Attempting to read {name} from S3")
-            dataframes[name] = read_csv_from_s3(s3_client, bucket_name, key)
-            logging.info(f"Successfully read {name}. Shape: {dataframes[name].shape}")
+            csv_files = list_csv_files_in_prefix(s3_client, bucket_name, prefix)
+            all_csv_files.extend(csv_files)
+        except Exception as list_error:
+            logging.warning(f"Failed to list files in prefix '{prefix}': {list_error}")
+            # Continue with other prefixes even if one fails
+
+    if not all_csv_files:
+        logging.warning("No CSV files found in any of the specified prefixes")
+        return {}
+
+    # Read all CSV files and store in a dictionary of DataFrames
+    dataframes = {}
+    for csv_key in all_csv_files:
+        try:
+            df_name = sanitize_dataframe_name(csv_key)
+            logging.info(f"Reading '{csv_key}' as '{df_name}'")
+            dataframes[df_name] = read_csv_from_s3(s3_client, bucket_name, csv_key)
+            logging.info(f"Successfully read '{df_name}'. Shape: {dataframes[df_name].shape}")
         except Exception as read_error:
-            logging.error(f"Failed to read {name}: {read_error}")
-            raise
+            logging.error(f"Failed to read {csv_key}: {read_error}")
+            # Continue with other files even if one fails
 
-    # Process the annotations dataframe using the dedicated function
-    try:
-        processed_annotations_df = process_annotations_dataframe(dataframes)
-        logging.info(
-            f"Successfully processed annotations dataframe. Shape: {processed_annotations_df.shape}"
-        )
-
-        movies_df = dataframes["movies"].merge(
-            dataframes["sites"][["SiteID", "LinkToMarineReserve"]],
-            on="SiteID",
-            how="left",
-        )
-
-        # List of columns to convert
-        time_columns = ["EventTimeStart", "EventTimeEnd"]
-
-        for col in time_columns:
-            # Convert to datetime, coercing errors to NaT (Not a Time)
-            # To avoid powerbi errors
-            movies_df[col] = pd.to_datetime(
-                movies_df[col], format="%H:%M", errors="coerce"
-            ).dt.time
-
-        return (
-            processed_annotations_df,
-            movies_df,
-            dataframes["sites"],
-            dataframes["surveys"],
-            dataframes["species"],
-            dataframes["errors"],
-        )
-
-    except Exception as process_error:
-        logging.error(f"Failed to process annotations dataframe: {process_error}")
-        raise
+    logging.info(f"Successfully loaded {len(dataframes)} dataframes")
+    return dataframes

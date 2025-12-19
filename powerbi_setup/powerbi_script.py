@@ -12,8 +12,8 @@ import importlib.util
 import sys
 import requests
 
-# Define the URL of the script
-script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/f92cb426565699aa0b4214a9efd102f4d9eedab3/powerbi_setup/get_kso_data_from_s3.py"
+# Define the URL of the script (using latest main branch)
+script_url = "https://raw.githubusercontent.com/wildlifeai/Spyfish-Aotearoa-toolkit/main/powerbi_setup/get_kso_data_from_s3.py"
 
 # Download the script content
 try:
@@ -32,10 +32,11 @@ try:
     exec(script_content, kso_to_pbi_module.__dict__)
     sys.modules["kso_to_pbi_module"] = kso_to_pbi_module
 
-    # Run with error handling
-    processed_annotations_df, movies_df, sites_df, surveys_df, species_df, errors_df = (
-        kso_to_pbi_module.main(env_path)
-    )
+    # Run with error handling - main() now returns a dictionary of dataframes
+    dataframes_dict = kso_to_pbi_module.main(env_path)
+    
+    # Make all dataframes available to PowerBI by adding them to global scope
+    globals().update(dataframes_dict)
 
 except Exception as e:
     print(f"Error: {str(e)}", file=sys.stderr)

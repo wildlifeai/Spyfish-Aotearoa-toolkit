@@ -70,8 +70,19 @@ IMPORTANT: Before running the script, change the first line of code to specify t
 
 Click OK.
 
+#### Dynamic Dataset Loading
 
-You should see the available datasets. Like in the screenshot below
+The PowerBI integration now **dynamically loads all CSV files** from the following S3 bucket prefix:
+- `spyfish_metadata/status/` - Contains status tracking files
+
+**Dataset Naming Convention:**
+All datasets are automatically named using the pattern: `{parent_directory}_{filename}`
+
+For example:
+- `spyfish_metadata/status/processing_status.csv` → `status_processing_status`
+- `spyfish_metadata/status/deployment_status.csv` → `status_deployment_status`
+
+You should see all available datasets in the PowerBI Navigator. Like in the screenshot below
 
 
 <img src="img/navigator_display_datasets_lodaded.png?raw=true" width="500" alt="loaded_datasets"/>
